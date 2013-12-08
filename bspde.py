@@ -123,7 +123,7 @@ class BSPde(object):
 		C = sigma / self.sigma
 		K = 2 * self.r / (sigma * sigma)
 		K_ = 2 * self.b / (sigma * sigma)
-		for (t, tau, dtau, c, k, k_) in reversed(zip(self.t[:-1], self.tau[:-1], self.tau[1:] - self.tau[:-1], C, K, K_)):
+		for (t, tau, dtau, c, k, k_) in reversed(zip(self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_)):
 			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
 			u = fd.solve_crank_nicolson(L, dtau, u)
 			Vhold = self.u_to_V(u)
