@@ -1,7 +1,8 @@
+import __init__
 import numpy
 import ito.findiff as fd
 
-def OptionPayoff(object):
+class OptionPayoff(object):
 	def expire(self, t, S):
 		"""
 		Input:
@@ -47,7 +48,7 @@ def OptionPayoff(object):
 		"""
 		raise NotImplemented
 
-def BSPde(object):
+class BSPde(object):
 	"""
 	Solve the Black-Scholes Pde.
 	
@@ -63,7 +64,7 @@ def BSPde(object):
 	
 	The Black-Scholes equation is 
 		
-		dV/dt + sigma2/2 S2 d2V/dt2 + (r - b) S dV/dt - r V = 0
+		dV/dt + sigma2/2 S2 d2V/dS2 + (r - b) S dV/dS - r V = 0
 	
 	To solve this accurately we first apply the change of variables
 	
@@ -96,14 +97,15 @@ def BSPde(object):
 		self.sigma = sigma
 		
 		self.S0 = S[len(S) / 2]
-		self.x = self.S_to_x(S)
+		t0 = t[0]
+		self.x = self.S_to_x(t0, S)
 		self.T = t[-1]
 		self.tau = (self.T - t) * self.sigma * self.sigma / 2
 	
-	def S_to_x(self, S):
+	def S_to_x(self, t, S):
 		return numpy.log(S / self.S0) 
 	
-	def x_to_S(self, x):
+	def x_to_S(self, t, x):
 		return self.S0 * numpy.exp(x)
 	
 	def u_to_V(self, u):
@@ -112,7 +114,10 @@ def BSPde(object):
 	def V_to_u(self, V):
 		return 1. / self.S0 * V
 	
-	def solve(self, sigma):
+	def solve(self, sigma = None):
+		if sigma is None:
+			sigma = self.sigma
+		S = self.x_to_S(self.T, self.x)
 		V = self.payoff.expire(self.T, self.S)
 		u = self.V_to_u(V)
 		C = sigma / self.sigma
@@ -122,4 +127,61 @@ def BSPde(object):
 			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
 			u = fd.solve_crank_nicolson(L, dtau, u)
 			Vhold = self.u_to_V(u)
+			S = self.x_to_S(t, self.x)
+			V = self.payoff.early_ex(t, S, Vhold)
+			u = self.V_to_u(V)
+		return V
+
+class VanillaPayoff(object):
+	
+	def __init__(self, K, CP):
+		self.K = K
+		self.CP = str(CP)[0].upper()
+		if self.CP not in "CP":
+			raise ValueError, "Unrecognized call/put flag: " + CP
+		
+	def expire(self, t, S):
+		if self.CP == 'C':
+			V = (S - K)
+		else:
+			V = (K - S)
+		V[V <= 0] = 0
+		return V
+	
+	def boundary_hi(self, t, Shi):
+		raise NotImplemented
+	
+	def boundary_lo(self, t, Slo):
+		raise NotImplemented
+
+class AmericanPayoff(VanillaPayoff):
+	
+	def early_ex(self, t, S, Vhold):
+		V = self.expire(t, S)
+		V[V < Vhold] = Vhold
+		return V
+
+class EuropeanPayoff(VanillaPayoff):
+	
+	def early_ex(self, t, S, Vhold):
+		return Vhold
+
+
+if __name__ == '__main__':
+	
+	S0 = 100.
+	K = 100.
+	CP = 'C'
+	Nx = 101
+	Nt = 101
+	x = numpy.linspace(-.2, +.2, Nx)
+	S = S0 * numpy.exp(x)
+	T = .25
+	t = numpy.linspace(0, T, Nt)
+	r = numpy.zeros(Nt)
+	b = numpy.zeros(Nt)
+	payoff = EuropeanPayoff(K, CP)
+	sigma = .3 * numpy.ones(Nt)
+	pde = BSPde(payoff, S, t, r, b, sigma)
+	V = pde.solve()
 
