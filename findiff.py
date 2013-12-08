@@ -130,8 +130,8 @@ def solve_crank_nicolson(L, dt, y):
 	# (y2 - y1) / dt = L (y1 + y2) / 2
 	# y1 + L y1 dt / 2 = y2 - L y2 dt / 2
 	# y2 = (I - L dt / 2)-1 (I + L dt / 2) y1
-	op2 = I - L * dt
-	op1 = I + L * dt
+	op2 = 1 - L * dt / 2
+	op1 = 1 + L * dt / 2
 	z = op1(y)
 	y2 = op2.inv(z)
 	return y2
@@ -141,8 +141,14 @@ if __name__ == '__main__':
 	def l2(x):
 		return numpy.sqrt(numpy.sum(x * x)) / len(x)
 	
+	def l1(x):
+		return numpy.sum(numpy.abs(x)) / len(x)
+	
+	def linf(x):
+		return numpy.max(numpy.abs(x))
+	
 	def eq(x, y, eps = 1e-10):
-		return numpy.max(numpy.abs(x - y)) < eps
+		return linf(x - y) < eps
 	
 	t = numpy.linspace(0, 1, 1001)
 	x = t ** 2
@@ -163,7 +169,7 @@ if __name__ == '__main__':
 	# dy/dt = 1/2 d2y/dx2
 	def phi(x, sigma):
 		return numpy.exp(- x * x / (2 * sigma * sigma)) / sigma
-	x = numpy.linspace(-9, 9, 181)
+	x = numpy.linspace(-9, 9, 361)
 	sigma = 1
 	y = phi(x, sigma)
 	T = numpy.linspace(1, 2, 401)
@@ -172,19 +178,50 @@ if __name__ == '__main__':
 	# explicit
 	for (t, dt) in zip(T[1:], T[1:] - T[:-1]):
 		sigma_t = sigma * numpy.sqrt(t)
-		L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
-		L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+		#L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+		#L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
 		y = solve_explicit(L, dt, y)
 		Yt.append(y)
-		assert eq(y, phi(x, sigma_t), 1e-4)
-		assert l2(y - phi(x, sigma_t)) < 1e-4
+		u = phi(x, sigma_t)
+		assert eq(y, u, 1e-3)
+		assert l2(y - u) < 1e-4
+	print "explicit:"
+	print "l1:", l1(y - u)
+	print "l2:", l2(y - u)
+	print "linf:", linf(y - u)
+	print
 	# implicit
+	y = phi(x, sigma)
+	Yt = [ y ]
 	for (t, dt) in zip(T[1:], T[1:] - T[:-1]):
 		sigma_t = sigma * numpy.sqrt(t)
-		L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
-		L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+		#L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+		#L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
 		y = solve_implicit(L, dt, y)
 		Yt.append(y)
-		assert eq(y, phi(x, sigma_t), 1e-4)
-		assert l2(y - phi(x, sigma_t)) < 1e-4
-		
+		u = phi(x, sigma_t)
+		assert eq(y, u, 1e-3)
+		assert l2(y - u) < 1e-4
+	print "implicit:"
+	print "l1:", l1(y - u)
+	print "l2:", l2(y - u)
+	print "linf:", linf(y - u)
+	print
+	# crank-nicolson
+	y = phi(x, sigma)
+	Yt = [ y ]
+	for (t, dt) in zip(T[1:], T[1:] - T[:-1]):
+		sigma_t = sigma * numpy.sqrt(t)
+		#L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+		#L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+		y = solve_crank_nicolson(L, dt, y)
+		Yt.append(y)
+		u = phi(x, sigma_t)
+		assert eq(y, u, 1e-3)
+		assert l2(y - u) < 1e-4
+	print "crank-nicolson:"
+	print "l1:", l1(y - u)
+	print "l2:", l2(y - u)
+	print "linf:", linf(y - u)
+	print
+
