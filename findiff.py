@@ -136,6 +136,59 @@ def solve_crank_nicolson(L, dt, y):
 	y2 = op2.inv(z)
 	return y2
 
+def solve_jacobi(A, y, x0, tol, maxiter):
+	"""
+	Given A a linear operator and y vector, solve A x = y for x by Jacobi iteration.
+	"""
+	ul = A.bands.copy()
+	ul[1, :] = 0 
+	UL = FinDiffOp(ul)
+	d = A.bands[1, :]
+	x = x0
+	for _ in xrange(maxiter):
+		print ".", 
+		x = (y - UL(x)) / d
+		if l2(x - x0) <= tol:
+			return x
+		x0 = x
+	raise RuntimeError, "jacobi failed to converge after %d iterations" % maxiter
+
+def jacobi_step(d, UL, y, x0):
+	return (y - UL(x0)) / d
+
+def gauss_seidel_step(U, L, y, x0):
+	return U.inv(y - L(x0))
+
+def iterate(step, x0, tol, maxiter):
+	"""
+	Perform a iteration step until 
+	"""
+	x = x0
+	for _ in xrange(maxiter):
+		x = step(x)
+		if l2(x - x0) <= tol:
+			return x
+	raise RuntimeError, "Convergence failed."
+	
+def gauss_seidel(A, y, x0, tol, maxiter):
+	"""
+	Given A a linear operator and y vector, solve A x = y for x by Gauss-Seidel iteration.
+	"""
+	l = A.bands.copy()
+	l[0:2, :] = 0 
+	L = FinDiffOp(l)
+	u = A.bands.copy()
+	u[2, :] = 0
+	U = FinDiffOp(u)
+	x = x0
+	for _ in xrange(maxiter):
+		print ".", 
+		x = U.inv(y - L(x))
+		if l2(x - x0) <= tol:
+			return x
+		x0 = x
+	raise RuntimeError, "gauss-seidel failed to converge after %d iterations" % maxiter
+
 if __name__ == '__main__':
 	
 	def l2(x):
@@ -224,4 +277,55 @@ if __name__ == '__main__':
 	print "l2:", l2(y - u)
 	print "linf:", linf(y - u)
 	print
-
+	# solve implicit equation by jacobi
+	y = phi(x, sigma)
+	dt = .01
+	y2 = solve_jacobi(1 - L * dt, y, y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	print "jacobi: success"
+	# solve implicit equation by gauss-seidel
+	y = phi(x, sigma)
+	dt = .01
+	y2 = gauss_seidel(1 - L * dt, y, y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	print "gauss-seidel: success"
+	# solve crank-nicolson equation by jacobi
+	y = phi(x, sigma)
+	dt = .01
+	y2 = solve_jacobi(1 - L * dt / 2, (1 + L * dt / 2)(y), y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	print "jacobi: success"
+	# solve crank-nicolson equation by gauss-seidel
+	y = phi(x, sigma)
+	dt = .01
+	y2 = gauss_seidel(1 - L * dt / 2, (1 + L * dt / 2)(y), y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	print "gauss-seidel: success"
+	"""
+	# iterative solver for implicit scheme
+	y = phi(x, sigma)
+	dt = .01
+	y2 = solve_implicit(L, dt, y) # y2 = (I - L dt)-1 y
+	y0 = y
+	yn = y0
+	#import pdb; pdb.set_trace()
+	while 1:
+		print '.',
+		yn = y0 + (L * dt)(yn)
+		yn[0] = yn[1] - (x[1] - x[0]) * (yn[2] - yn[1]) / (x[2] - x[1])
+		yn[-1] = yn[-2] + (x[-1] - x[-2]) * (yn[-2] - yn[-3]) / (x[-2] - x[-3]) 
+		if l2(yn - y2) < 1e-7:
+			break
+	print
+	# iterative solver for crank-nicolson scheme
+	L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+	L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+	y = phi(x, sigma)
+	dt = .1
+	y2 = solve_crank_nicolson(L, dt, y) # y2 = (I - L dt / 2)-1 (I + L dt / 2) y
+	y0 = (1 + L * dt / 2)(y)
+	yn = y0
+	while 1:
+		import pdb; pdb.set_trace()
+		print 'C',
+		yn = y0 + (L * dt / 2)(yn)
+		if l2(yn - y2) < 1e-7:
+			break
+	print
+	"""
