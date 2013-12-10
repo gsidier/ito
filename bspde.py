@@ -88,13 +88,15 @@ class BSPde(object):
 			k' = 2 b / sigma'2
 	"""
 	
-	def __init__(self, payoff, S, t, r, b, sigma):
+	def __init__(self, payoff, S, t, r, b, sigma, method = 'implicit', iteration = None):
 		self.payoff = payoff
 		self.S = S
 		self.t = t
 		self.r = r
 		self.b = b
 		self.sigma = sigma
+		self.method = method
+		self.iteration = iteration
 		
 		self.S0 = S[len(S) / 2]
 		t0 = t[0]
@@ -123,13 +125,42 @@ class BSPde(object):
 		C = sigma / self.sigma
 		K = 2 * self.r / (sigma * sigma)
 		K_ = 2 * self.b / (sigma * sigma)
-		for (t, tau, dtau, c, k, k_) in reversed(zip(self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_)):
-			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
-			u = fd.solve_crank_nicolson(L, dtau, u)
+		step = {
+			'crank_nicolson': fd.solve_crank_nicolson,
+			'explicit': fd.solve_explicit,
+			'implicit': fd.solve_implicit
+		}[self.method]
+
+		def proj(t, S, u):
 			Vhold = self.u_to_V(u)
-			S = self.x_to_S(t, self.x)
 			V = self.payoff.early_ex(t, S, Vhold)
 			u = self.V_to_u(V)
+			return u
+		
+		for (t, tau, dtau, c, k, k_) in reversed(zip(self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_)):
+			S = self.x_to_S(t, self.x)
+			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
+			if self.iteration:
+				solver = {
+					'jacobi': fd.solve_jacobi,
+					'gauss-seidel': fd.solve_gauss_seidel,
+				}[self.iteration]
+				
+				if self.method == 'crank_nicolson':
+					rhs = (1 + L * dt / 2)(u)
+					A = (1 + L * dt / 2)
+				elif self.method == 'implicit':
+					rhs = u
+					A = 1 + L * dt
+				else:
+					raise NotImplemented, "iteration not defined for fd scheme %s" % self.method
+				
+				u = solver(A, rhs, u, 1e-8, 100, lambda u: proj(t, S, u))
+				
+			else:
+				u = fd.solve_crank_nicolson(L, dtau, u)
+				u = proj(t, S, u)
+		V = self.u_to_V(u)
 		return V
 
 class VanillaPayoff(object):
@@ -166,7 +197,6 @@ class EuropeanPayoff(VanillaPayoff):
 	def early_ex(self, t, S, Vhold):
 		return Vhold
 
-
 if __name__ == '__main__':
 	
 	S0 = 100.
@@ -174,14 +204,18 @@ if __name__ == '__main__':
 	CP = 'C'
 	Nx = 101
 	Nt = 101
-	x = numpy.linspace(-.2, +.2, Nx)
-	S = S0 * numpy.exp(x)
+	sns = numpy.linspace(-6, +6, Nx)
+	sigma = .3 * numpy.ones(Nt)
 	T = .25
 	t = numpy.linspace(0, T, Nt)
+	x = sns * sigma[0] * numpy.sqrt(T)
+	S = S0 * numpy.exp(x)
 	r = numpy.zeros(Nt)
 	b = numpy.zeros(Nt)
 	payoff = EuropeanPayoff(K, CP)
-	sigma = .3 * numpy.ones(Nt)
 	pde = BSPde(payoff, S, t, r, b, sigma)
 	V = pde.solve()
+	
+	from bs import black_scholes_1973
+	Vref = black_scholes_1973(T, S, sigma[0], r[0], b[0], K, CP)['price']
 

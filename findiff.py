@@ -136,6 +136,25 @@ def solve_crank_nicolson(L, dt, y):
 	y2 = op2.inv(z)
 	return y2
 
+def iterate(step, x0, tol, maxiter, proj = None):
+	"""
+	Perform a iteration step until convergence, or we run out of iterations.
+	"""
+	if proj:
+		step1 = lambda x: proj(step(x))
+	else:
+		step1 = step
+	for _ in xrange(maxiter):
+		print ".", 
+		x = step1(x0)
+		if l2(x - x0) <= tol:
+			return x
+		x0 = x
+	raise RuntimeError, "Convergence failed."
+
+def jacobi_step(d, UL, y, x0):
+	return (y - UL(x0)) / d
+
 def solve_jacobi(A, y, x0, tol, maxiter):
 	"""
 	Given A a linear operator and y vector, solve A x = y for x by Jacobi iteration.
@@ -144,33 +163,12 @@ def solve_jacobi(A, y, x0, tol, maxiter):
 	ul[1, :] = 0 
 	UL = FinDiffOp(ul)
 	d = A.bands[1, :]
-	x = x0
-	for _ in xrange(maxiter):
-		print ".", 
-		x = (y - UL(x)) / d
-		if l2(x - x0) <= tol:
-			return x
-		x0 = x
-	raise RuntimeError, "jacobi failed to converge after %d iterations" % maxiter
-
-def jacobi_step(d, UL, y, x0):
-	return (y - UL(x0)) / d
+	return iterate(lambda x: jacobi_step(d, UL, y, x), x0, tol, maxiter)
 
 def gauss_seidel_step(U, L, y, x0):
 	return U.inv(y - L(x0))
-
-def iterate(step, x0, tol, maxiter):
-	"""
-	Perform a iteration step until 
-	"""
-	x = x0
-	for _ in xrange(maxiter):
-		x = step(x)
-		if l2(x - x0) <= tol:
-			return x
-	raise RuntimeError, "Convergence failed."
 	
-def gauss_seidel(A, y, x0, tol, maxiter):
+def solve_gauss_seidel(A, y, x0, tol, maxiter, proj = None):
 	"""
 	Given A a linear operator and y vector, solve A x = y for x by Gauss-Seidel iteration.
 	"""
@@ -180,14 +178,7 @@ def gauss_seidel(A, y, x0, tol, maxiter):
 	u = A.bands.copy()
 	u[2, :] = 0
 	U = FinDiffOp(u)
-	x = x0
-	for _ in xrange(maxiter):
-		print ".", 
-		x = U.inv(y - L(x))
-		if l2(x - x0) <= tol:
-			return x
-		x0 = x
-	raise RuntimeError, "gauss-seidel failed to converge after %d iterations" % maxiter
+	return iterate(lambda x: gauss_seidel_step(U, L, y, x), x0, tol, maxiter, proj)
 
 if __name__ == '__main__':
 	
@@ -285,7 +276,7 @@ if __name__ == '__main__':
 	# solve implicit equation by gauss-seidel
 	y = phi(x, sigma)
 	dt = .01
-	y2 = gauss_seidel(1 - L * dt, y, y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	y2 = solve_gauss_seidel(1 - L * dt, y, y, 1e-8, 100) # y2 = (I - L dt)-1 y
 	print "gauss-seidel: success"
 	# solve crank-nicolson equation by jacobi
 	y = phi(x, sigma)
@@ -295,7 +286,7 @@ if __name__ == '__main__':
 	# solve crank-nicolson equation by gauss-seidel
 	y = phi(x, sigma)
 	dt = .01
-	y2 = gauss_seidel(1 - L * dt / 2, (1 + L * dt / 2)(y), y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	y2 = solve_gauss_seidel(1 - L * dt / 2, (1 + L * dt / 2)(y), y, 1e-8, 100) # y2 = (I - L dt)-1 y
 	print "gauss-seidel: success"
 	"""
 	# iterative solver for implicit scheme
