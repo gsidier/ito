@@ -126,7 +126,7 @@ class BSPde(object):
 		K = 2 * self.r / (sigma * sigma)
 		K_ = 2 * self.b / (sigma * sigma)
 		step = {
-			'crank_nicolson': fd.solve_crank_nicolson,
+			'crank-nicolson': fd.solve_crank_nicolson,
 			'explicit': fd.solve_explicit,
 			'implicit': fd.solve_implicit
 		}[self.method]
@@ -146,7 +146,7 @@ class BSPde(object):
 					'gauss-seidel': fd.solve_gauss_seidel,
 				}[self.iteration]
 				
-				if self.method == 'crank_nicolson':
+				if self.method == 'crank-nicolson':
 					rhs = (1 + L * dt / 2)(u)
 					A = (1 + L * dt / 2)
 				elif self.method == 'implicit':
@@ -158,7 +158,7 @@ class BSPde(object):
 				u = solver(A, rhs, u, 1e-8, 100, lambda u: proj(t, S, u))
 				
 			else:
-				u = fd.solve_crank_nicolson(L, dtau, u)
+				u = step(L, dtau, u)
 				u = proj(t, S, u)
 		V = self.u_to_V(u)
 		return V
