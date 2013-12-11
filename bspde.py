@@ -116,7 +116,8 @@ class BSPde(object):
 	def V_to_u(self, V):
 		return 1. / self.S0 * V
 	
-	def solve(self, sigma = None):
+	def solve(self, sigma = None, outputs = [ ]):
+		res = { }
 		if sigma is None:
 			sigma = self.sigma
 		S = self.x_to_S(self.T, self.x)
@@ -136,6 +137,8 @@ class BSPde(object):
 			V = self.payoff.early_ex(t, S, Vhold)
 			u = self.V_to_u(V)
 			return u
+		
+		Vt = [ ]
 		
 		for (t, tau, dtau, c, k, k_) in reversed(zip(self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_)):
 			S = self.x_to_S(t, self.x)
@@ -160,8 +163,21 @@ class BSPde(object):
 			else:
 				u = step(L, dtau, u)
 				u = proj(t, S, u)
+			
+			V = self.u_to_V(u)
+			if 'full_grid' in outputs:
+				Vt.append(V)
+		
 		V = self.u_to_V(u)
-		return V
+		res['price'] = V
+		if 'full_grid' in outputs:
+			Vt = list(reversed(Vt))
+			res['full_grid'] = Vt
+		
+		if outputs:
+			return res
+		else:
+			return V
 
 class VanillaPayoff(object):
 	
@@ -199,6 +215,9 @@ class EuropeanPayoff(VanillaPayoff):
 
 if __name__ == '__main__':
 	
+	def l2(x):
+		return numpy.sqrt(numpy.sum(x * x)) / len(x)
+	
 	S0 = 100.
 	K = 100.
 	CP = 'C'
@@ -214,8 +233,11 @@ if __name__ == '__main__':
 	b = numpy.zeros(Nt)
 	payoff = EuropeanPayoff(K, CP)
 	pde = BSPde(payoff, S, t, r, b, sigma)
-	V = pde.solve()
+	res = pde.solve(outputs = [ "full_grid" ])
+	V = res['price']
 	
 	from bs import black_scholes_1973
-	Vref = black_scholes_1973(T, S, sigma[0], r[0], b[0], K, CP)['price']
+	Vref = black_scholes_1973(T, S, sigma[0], r[0], b[0], K, CP)
+	
+	assert(l2(V - Vref) < 1e-3)
 

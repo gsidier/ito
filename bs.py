@@ -35,7 +35,10 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 		V = exp(- r * T) * (K * N(d1) - F * N(d2))
 	else:
 		raise ValueError, "Bad value for 'CP' parameter: " + CP
-	res['price'] = V
+	if greeks:
+		res['price'] = V
+	else:
+		res = V
 	if 'delta' in greeks:
 		if CP == 'C':
 			delta = exp(- b * T) * N(d1)
