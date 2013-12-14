@@ -28,11 +28,11 @@ class FinDiffOp(object):
 	def Id(cls, n):
 		return FinDiffOp([numpy.zeros(n), numpy.ones(n), numpy.zeros(n)])
 	
-	def set_boundary_hi(self, d0, u0):
+	def set_boundary_lo(self, d0, u0):
 		self.bands[0, 1] = u0
 		self.bands[1, 0] = d0
 	
-	def set_boundary_lo(self, ln, dn):
+	def set_boundary_hi(self, ln, dn):
 		self.bands[2, -2] = ln
 		self.bands[1, -1] = dn
 	
@@ -108,32 +108,32 @@ def d2_dx2(x):
 	l = 2 / (k * (h + k))
 	return noboundary(l, d, u)
 
-def solve_explicit(L, dt, y):
-	# dy / dt = L y
-	# (y2 - y1) / dt = L y1
-	# y2 = y1 + L y1 dt
-	dy = dt * L(y)
+def solve_explicit(L, c, dt, y):
+	# dy / dt = L y + c
+	# (y2 - y1) / dt = L y1 + c
+	# y2 = y1 + (L y1 + c) dt
+	dy = dt * (L(y) + c)
 	y2 = y + dy
 	return y2
 
-def solve_implicit(L, dt, y):
-	# dy / dt = L y
-	# (y2 - y1) / dt = L y2
-	# y2 - L y2 dt = y1
-	# y2 = (I - L dt)-1 y1
+def solve_implicit(L, c, dt, y):
+	# dy / dt = L y + c
+	# (y2 - y1) / dt = L y2 + c
+	# y2 - L y2 dt = y1 + c dt
+	# y2 = (I - L dt)-1 (y1 + c dt)
 	op = 1 - dt * L
-	y2 = op.inv(y)
+	y2 = op.inv(y + c * dt) 
 	return y2
 
-def solve_crank_nicolson(L, dt, y):
-	# dy / dt = L y
-	# (y2 - y1) / dt = L (y1 + y2) / 2
-	# y1 + L y1 dt / 2 = y2 - L y2 dt / 2
-	# y2 = (I - L dt / 2)-1 (I + L dt / 2) y1
+def solve_crank_nicolson(L, c, dt, y):
+	# dy / dt = L y + c
+	# (y2 - y1) / dt = L (y1 + y2) / 2 + c
+	# y1 + L y1 dt / 2 + c dt = y2 - L y2 dt / 2
+	# y2 = (I - L dt / 2)-1 ((I + L dt / 2) y1 + c dt)
 	op2 = 1 - L * dt / 2
 	op1 = 1 + L * dt / 2
 	z = op1(y)
-	y2 = op2.inv(z)
+	y2 = op2.inv(z + c * dt)
 	return y2
 
 def iterate(step, x0, tol, maxiter, proj = None):
@@ -222,9 +222,9 @@ if __name__ == '__main__':
 	# explicit
 	for (t, dt) in zip(T[1:], T[1:] - T[:-1]):
 		sigma_t = sigma * numpy.sqrt(t)
-		#L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
-		#L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
-		y = solve_explicit(L, dt, y)
+		#L.set_boundary_lo(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+		#L.set_boundary_hi(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+		y = solve_explicit(L, 0, dt, y)
 		Yt.append(y)
 		u = phi(x, sigma_t)
 		assert eq(y, u, 1e-3)
@@ -239,9 +239,9 @@ if __name__ == '__main__':
 	Yt = [ y ]
 	for (t, dt) in zip(T[1:], T[1:] - T[:-1]):
 		sigma_t = sigma * numpy.sqrt(t)
-		#L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
-		#L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
-		y = solve_implicit(L, dt, y)
+		#L.set_boundary_lo(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+		#L.set_boundary_hi(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+		y = solve_implicit(L, 0, dt, y)
 		Yt.append(y)
 		u = phi(x, sigma_t)
 		assert eq(y, u, 1e-3)
@@ -256,9 +256,9 @@ if __name__ == '__main__':
 	Yt = [ y ]
 	for (t, dt) in zip(T[1:], T[1:] - T[:-1]):
 		sigma_t = sigma * numpy.sqrt(t)
-		#L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
-		#L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
-		y = solve_crank_nicolson(L, dt, y)
+		#L.set_boundary_lo(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+		#L.set_boundary_hi(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+		y = solve_crank_nicolson(L, 0, dt, y)
 		Yt.append(y)
 		u = phi(x, sigma_t)
 		assert eq(y, u, 1e-3)
@@ -292,7 +292,7 @@ if __name__ == '__main__':
 	# iterative solver for implicit scheme
 	y = phi(x, sigma)
 	dt = .01
-	y2 = solve_implicit(L, dt, y) # y2 = (I - L dt)-1 y
+	y2 = solve_implicit(L, 0, dt, y) # y2 = (I - L dt)-1 y
 	y0 = y
 	yn = y0
 	#import pdb; pdb.set_trace()
@@ -305,11 +305,11 @@ if __name__ == '__main__':
 			break
 	print
 	# iterative solver for crank-nicolson scheme
-	L.set_boundary_hi(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
-	L.set_boundary_lo(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
+	L.set_boundary_lo(d0 = .5 * (x[-1] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), u0 = 0)
+	L.set_boundary_hi(dn = .5 * (x[0] ** 2 / sigma_t ** 4 - 1 / sigma_t ** 2), ln = 0)
 	y = phi(x, sigma)
 	dt = .1
-	y2 = solve_crank_nicolson(L, dt, y) # y2 = (I - L dt / 2)-1 (I + L dt / 2) y
+	y2 = solve_crank_nicolson(L, 0, dt, y) # y2 = (I - L dt / 2)-1 (I + L dt / 2) y
 	y0 = (1 + L * dt / 2)(y)
 	yn = y0
 	while 1:
