@@ -108,32 +108,81 @@ def d2_dx2(x):
 	l = 2 / (k * (h + k))
 	return noboundary(l, d, u)
 
-def solve_explicit(L, c, dt, y):
+def solve_explicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None)):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L y1 + c
 	# y2 = y1 + (L y1 + c) dt
 	dy = dt * (L(y) + c)
 	y2 = y + dy
+	
+	dirichlet_lo, dirichlet_hi = dirichlet
+	if dirichlet_lo:
+		y2[0] = dirichlet_lo
+	if dirichlet_hi:
+		y2[-1] = dirichlet_hi
+	
+	neumann_lo, neumann_hi = neumann
+	if neumann_lo:
+		y2[0] = y2[1] - neumann_lo
+	if neumann_hi:
+		y2[-1] = y2[-2] + neumann_hi
+	
 	return y2
 
-def solve_implicit(L, c, dt, y):
+def solve_implicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None)):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L y2 + c
 	# y2 - L y2 dt = y1 + c dt
 	# y2 = (I - L dt)-1 (y1 + c dt)
 	op = 1 - dt * L
-	y2 = op.inv(y + c * dt) 
+	z = y + c * dt
+	set_implicit_boundaries(op, z, dirichlet = dirichlet, neumann = neumann)
+	y2 = op.inv(z) 
 	return y2
 
-def solve_crank_nicolson(L, c, dt, y):
+def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, None)):
+	# A x = b
+	# x[0] = x0
+	# x[n] = xn
+	# A[0, j] = 1{j == 0}
+	# b[0] = x0
+	# A[n, j] = 1{j == n}
+	# b[n] = xn
+	dirichlet_lo, dirichlet_hi = dirichlet
+	if dirichlet_lo:
+		op2.set_boundary(d0 = 1, u0 = 0)
+		b[0] = dirichlet_lo
+	if dirichlet_hi:
+		op2.set_boundary(dn = 1, ln = 0)
+		b[-1] = dirichlet_hi
+	
+	# A x = b
+	# x[1] - x[0] = dx0
+	# x[n] - x[n-1] = dxn
+	# A[0, 0] = -1, A[0, 1] = 1, A[0, j] = 0 (j > 1)
+	# b[0] = dx0
+	# A[n, n-1] = -1, A[n, n] = 1, A[n, j] = 0 (j < n-1)
+	# b[n] = dxn
+	neumann_lo, neumann_hi = neumann
+	if neumann_lo:
+		op2.set_boundary(d0 = -1, u0 = 1)
+		b[0] = neumann_lo
+	if neumann_hi:
+		op2.set_boundary(ln = -1, dn = 1)
+		b[-1] = neumann_hi
+
+def solve_crank_nicolson(L, c, dt, y, dirichlet = (None, None), neumann = (None, None)):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L (y1 + y2) / 2 + c
 	# y1 + L y1 dt / 2 + c dt = y2 - L y2 dt / 2
 	# y2 = (I - L dt / 2)-1 ((I + L dt / 2) y1 + c dt)
+	
 	op2 = 1 - L * dt / 2
 	op1 = 1 + L * dt / 2
-	z = op1(y)
-	y2 = op2.inv(z + c * dt)
+	z1 = op1(y)
+	z2 = z1 + c * dt
+	set_implicit_boundaries(op2, z2, dirichlet = dirichlet, neumann = neumann)
+	y2 = op2.inv(z2)
 	return y2
 
 def iterate(step, x0, tol, maxiter, proj = None):
