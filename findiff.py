@@ -150,10 +150,10 @@ def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, Non
 	# b[n] = xn
 	dirichlet_lo, dirichlet_hi = dirichlet
 	if dirichlet_lo:
-		op2.set_boundary(d0 = 1, u0 = 0)
+		A.set_boundary_lo(d0 = 1, u0 = 0)
 		b[0] = dirichlet_lo
 	if dirichlet_hi:
-		op2.set_boundary(dn = 1, ln = 0)
+		A.set_boundary_hi(dn = 1, ln = 0)
 		b[-1] = dirichlet_hi
 	
 	# A x = b
@@ -165,10 +165,10 @@ def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, Non
 	# b[n] = dxn
 	neumann_lo, neumann_hi = neumann
 	if neumann_lo:
-		op2.set_boundary(d0 = -1, u0 = 1)
+		A.set_boundary_lo(d0 = -1, u0 = 1)
 		b[0] = neumann_lo
 	if neumann_hi:
-		op2.set_boundary(ln = -1, dn = 1)
+		A.set_boundary_hi(ln = -1, dn = 1)
 		b[-1] = neumann_hi
 
 def solve_crank_nicolson(L, c, dt, y, dirichlet = (None, None), neumann = (None, None)):

@@ -14,25 +14,18 @@ class OptionPayoff(object):
 		"""
 		raise NotImplemented
 	
-	def boundary_hi(self, t, Shi):
+	def boundary(self, t, S, pde):
 		"""
 		Input:
 			t: single time of expiry
 			S: single underlyer price
+			pde: a bspde object
 		
 		Return:
-			V: single option price
-		"""
-		raise NotImplemented
-	
-	def boundary_lo(self, t, Slo):
-		"""
-		Input:
-			t: single time of expiry
-			S: single underlyer price
-		
-		Return:
-			V: single option price
+			{
+				'dirichlet': (lo, hi),
+				'neumann': (lo, hi)
+			}
 		"""
 		raise NotImplemented
 	
@@ -201,20 +194,21 @@ class BSPde(object):
 			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
 			const[:] = 0
 			B_t_T = self.discount[-1] / disc_t
-			if self.payoff.CP == 'C':
-				# du/dtau = dV/dtau / S0 = 1/S0 d(S - K B(t, T))dt dt/dtau = - K dB(t, T)/dt dt/dtau
-				# => du = - 1/S0 K dB(t, T)/dtau dtau
-				# dB/dtau = - dr/dtau B = - k B
-				# => du = k B K
-				L.set_boundary_lo(0, 0)
-				L.set_boundary_hi(0, 0)
-				const[-1] = k * B_t_T * self.payoff.K / S0
-			else:
-				# u = K B(t, T) - S
-				# du = - k K
-				L.set_boundary_lo(0, 0)
-				L.set_boundary_hi(0, 0)
-				const[0] = - k * self.payoff.K / S0
+			
+			bounds = self.payoff.boundary(t, S, self, locals())
+			if 'dirichlet' in bounds:
+				dirichlet_lo, dirichlet_hi = bounds['dirichlet']
+				dirichlet_lo = self.V_to_u(dirichlet_lo) if dirichlet_lo is not None else None
+				dirichlet_hi = self.V_to_u(dirichlet_hi) if dirichlet_hi is not None else None
+				bounds['dirichlet'] = dirichlet_lo, dirichlet_hi
+			if 'neumann' in bounds:
+				neumann_lo, neumann_hi = bounds['neumann']
+				#du/dx = dV/dS du/dV dS/dx = u dV/dS
+				if neumann_lo is not None:
+					neumann_lo = u[0] * neumann_lo # tmp!
+				if neumann_hi is not None:
+					neumann_hi = u[-1] * neumann_hi # tmp!
+				bounds['neumann'] = neumann_lo, neumann_hi
 			
 			if self.iteration:
 				solver = {
@@ -234,7 +228,7 @@ class BSPde(object):
 				u = solver(A, rhs, u, 1e-8, 100, lambda u: proj(t, S, u))
 				
 			else:
-				u = step(L, const, dtau, u)
+				u = step(L, const, dtau, u, ** bounds)
 				u = proj(t, S, u)
 			
 			V = self.u_to_V(u)
@@ -268,10 +262,7 @@ class VanillaPayoff(object):
 		V[V <= 0] = 0
 		return V
 	
-	def boundary_hi(self, t, Shi):
-		raise NotImplemented
-	
-	def boundary_lo(self, t, Slo):
+	def boundary(self, t, S, pde, pdevars):
 		raise NotImplemented
 
 class AmericanPayoff(VanillaPayoff):
@@ -285,6 +276,17 @@ class EuropeanPayoff(VanillaPayoff):
 	
 	def early_ex(self, t, S, Vhold):
 		return Vhold
+
+	def boundary(self, t, S, pde, pdevars):
+		B_t_T = pdevars['B_t_T']
+		if self.CP == 'C':
+			return dict(
+				dirichlet = (0., S[-1] - self.K * B_t_T)
+			)
+		else:
+			return dict(
+				dirichlet = (self.K * B_t_T - S, 0.)	
+			)
 
 if __name__ == '__main__':
 	
