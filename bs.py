@@ -32,7 +32,7 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 	if CP == 'C':
 		V = exp(- r * T) * (F * N(d1) - K * N(d2))
 	elif CP == 'P':
-		V = exp(- r * T) * (K * N(d1) - F * N(d2))
+		V = exp(- r * T) * (K * N(- d2) - F * N(- d1))
 	else:
 		raise ValueError, "Bad value for 'CP' parameter: " + CP
 	if greeks:

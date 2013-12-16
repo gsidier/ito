@@ -285,7 +285,7 @@ class EuropeanPayoff(VanillaPayoff):
 			)
 		else:
 			return dict(
-				dirichlet = (self.K * B_t_T - S, 0.)	
+				dirichlet = (self.K * B_t_T - S[0], 0.)
 			)
 
 if __name__ == '__main__':
@@ -301,7 +301,6 @@ if __name__ == '__main__':
 	
 	S0 = 100.
 	K = 100.
-	CP = 'C'
 	Nx = 101
 	Nt = 101
 	sns = numpy.linspace(-6, +6, Nx)
@@ -312,17 +311,30 @@ if __name__ == '__main__':
 	S = S0 * numpy.exp(x)
 	r = 0.02
 	b = 0
-	payoff = EuropeanPayoff(K, CP)
+	
 	nexpl = 20
 	method = [ 'explicit' ] * nexpl + [ 'crank-nicolson' ] * (Nt - 1 - nexpl)
 	#method = 'explicit'
+	
+	payoff = EuropeanPayoff(K, 'C')
 	pde = BSPde(payoff, S, t, r, b, [], sigma, method)
 	res = pde.solve(outputs = [ "full_grid" ])
 	V = res['price']
 	Vt = numpy.array(res['full_grid'])
 	
 	from bs import black_scholes_1973
-	Vref = black_scholes_1973(T, S, sigma, r, b, K, CP)
+	Vref = black_scholes_1973(T, S, sigma, r, b, K, 'C')
+	
+	assert(l2(V - Vref) < .6e-2)
+
+	payoff = EuropeanPayoff(K, 'P')
+	pde = BSPde(payoff, S, t, r, b, [], sigma, method)
+	res = pde.solve(outputs = [ "full_grid" ])
+	V = res['price']
+	Vt = numpy.array(res['full_grid'])
+	
+	from bs import black_scholes_1973
+	Vref = black_scholes_1973(T, S, sigma, r, b, K, 'P')
 	
 	assert(l2(V - Vref) < .6e-2)
 
