@@ -204,11 +204,11 @@ class BSPde(object):
 			if self.payoff.CP == 'C':
 				# du/dtau = dV/dtau / S0 = 1/S0 d(S - K B(t, T))dt dt/dtau = - K dB(t, T)/dt dt/dtau
 				# => du = - 1/S0 K dB(t, T)/dtau dtau
-				# dB/dtau = - dr/dtau = - k
-				# => du = k K
+				# dB/dtau = - dr/dtau B = - k B
+				# => du = k B K
 				L.set_boundary_lo(0, 0)
 				L.set_boundary_hi(0, 0)
-				const[-1] = k * self.payoff.K / S0
+				const[-1] = k * B_t_T * self.payoff.K / S0
 			else:
 				# u = K B(t, T) - S
 				# du = - k K
