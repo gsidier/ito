@@ -208,13 +208,13 @@ class BSPde(object):
 				# => du = k K
 				L.set_boundary_lo(0, 0)
 				L.set_boundary_hi(0, 0)
-				const[-1] = k * payoff.K / S0
+				const[-1] = k * self.payoff.K / S0
 			else:
 				# u = K B(t, T) - S
 				# du = - k K
 				L.set_boundary_lo(0, 0)
 				L.set_boundary_hi(0, 0)
-				const[0] = - k * payoff.K / S0
+				const[0] = - k * self.payoff.K / S0
 			
 			if self.iteration:
 				solver = {
