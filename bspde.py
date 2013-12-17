@@ -109,7 +109,7 @@ class BSPde(object):
 		self.discount = numpy.insert(numpy.cumprod([numpy.exp(- rt * dt) for (rt, dt) in zip(self.r[:len(self.t) - 1], self.t[1:] - self.t[:-1]) ]
 				), 0, 1.) ## numpy.exp(- r * t)
 		
-		# X = S + D
+		# S = X + D
 		# Dt = sum[ti >= t] B(t, ti) * di
 		divs_t = [ ] # divs_t[j] = sum(B(t, ti) * di for (di, ti) in divs if t[j] <= ti < t[j+1])
 		divs = [(ti, di) for (ti, di) in divs if ti >= self.t[0]]
@@ -127,24 +127,30 @@ class BSPde(object):
 		sumdivs_t = numpy.cumsum(divs_t[::-1])[::-1]
 		self.D = sumdivs_t / self.discount
 		
-		self.S0 = S[len(S) / 2]
+		self.X0 = S[len(S) / 2] - self.D[0]
 		t0 = t[0]
-		self.x = self.S_to_x(t0, S)
+		self.x = self.S_to_x(0, S)
 		self.T = t[-1]
 		dtau = (t[1:] - t[:-1]) * self.sigma * self.sigma / 2
 		self.tau = numpy.append(numpy.cumsum(dtau[::-1])[::-1], 0)
 	
-	def S_to_x(self, t, S):
-		return numpy.log(S / self.S0) 
+	def S_to_x(self, i, S):
+		return self.X_to_x(S - self.D[i]) 
 	
-	def x_to_S(self, t, x):
-		return self.S0 * numpy.exp(x)
+	def x_to_S(self, i, x):
+		return self.x_to_X(x) + self.D[i]
+	
+	def X_to_x(self, X):
+		return numpy.log(X / self.X0)
+	
+	def x_to_X(self, x):
+		return self.X0 * numpy.exp(x)
 	
 	def u_to_V(self, u):
-		return self.S0 * u
+		return self.X0 * u
 	
 	def V_to_u(self, V):
-		return 1. / self.S0 * V
+		return 1. / self.X0 * V
 	
 	def solve(self, sigma = None, outputs = [ ]):
 		"""
@@ -167,8 +173,8 @@ class BSPde(object):
 			sigma = self.sigma
 		else:
 			sigma = sigma + numpy.zeros(self.Nt - 1)
-		S = self.x_to_S(self.T, self.x)
-		V = self.payoff.expire(self.T, self.S)
+		S = self.x_to_S(-1, self.x)
+		V = self.payoff.expire(self.T, S)
 		u = self.V_to_u(V)
 		C = sigma / self.sigma
 		K = 2 * self.r / (sigma * sigma)
@@ -189,8 +195,8 @@ class BSPde(object):
 		Vt = [ ]
 		const = numpy.zeros(Nx)
 		
-		for (t, tau, dtau, c, k, k_, disc_t, step) in reversed(zip(self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_, self.discount, steps)):
-			S = self.x_to_S(t, self.x)
+		for (i, t, tau, dtau, c, k, k_, disc_t, step) in reversed(zip(range(self.Nt - 1), self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_, self.discount, steps)):
+			S = self.x_to_S(i, self.x)
 			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
 			const[:] = 0
 			B_t_T = self.discount[-1] / disc_t
@@ -326,7 +332,7 @@ if __name__ == '__main__':
 	Vref = black_scholes_1973(T, S, sigma, r, b, K, 'C')
 	
 	assert(l2(V - Vref) < .6e-2)
-
+	
 	payoff = EuropeanPayoff(K, 'P')
 	pde = BSPde(payoff, S, t, r, b, [], sigma, method)
 	res = pde.solve(outputs = [ "full_grid" ])
@@ -337,4 +343,3 @@ if __name__ == '__main__':
 	Vref = black_scholes_1973(T, S, sigma, r, b, K, 'P')
 	
 	assert(l2(V - Vref) < .6e-2)
-
