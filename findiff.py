@@ -225,7 +225,7 @@ def iterate(step, x0, tol, maxiter, proj = None):
 def jacobi_step(d, UL, y, x0):
 	return (y - UL(x0)) / d
 
-def solve_jacobi(A, y, x0, tol, maxiter, proj = None):
+def solve_jacobi(A, y, x0, tol, maxiter, proj = None, ** boundary):
 	"""
 	Given A a linear operator and y vector, solve A x = y for x by Jacobi iteration.
 	"""
@@ -233,12 +233,18 @@ def solve_jacobi(A, y, x0, tol, maxiter, proj = None):
 	ul[1, :] = 0 
 	UL = FinDiffOp(ul)
 	d = A.bands[1, :]
-	return iterate(lambda x: jacobi_step(d, UL, y, x), x0, tol, maxiter, proj)
+	def project(x):
+		x1 = proj(x) if proj else x
+		set_explicit_boundaries(x1, ** boundary)
+		return x1
+	return iterate(lambda x: jacobi_step(d, UL, y, x), x0, tol, maxiter, project)
 
-def gauss_seidel_step(U, L, y, x0):
-	return U.inv(y - L(x0))
+def gauss_seidel_step(U, L, y, x0, ** boundary):
+	rhs = y - L(x0)
+	set_implicit_boundaries(U, rhs, ** boundary)
+	return U.inv(rhs)
 	
-def solve_gauss_seidel(A, y, x0, tol, maxiter, proj = None):
+def solve_gauss_seidel(A, y, x0, tol, maxiter, proj = None, ** boundary):
 	"""
 	Given A a linear operator and y vector, solve A x = y for x by Gauss-Seidel iteration.
 	"""
@@ -256,7 +262,7 @@ def solve_gauss_seidel(A, y, x0, tol, maxiter, proj = None):
 	u[0, :] = 0
 	U = FinDiffOp(u)
 	"""
-	return iterate(lambda x: gauss_seidel_step(U, L, y, x), x0, tol, maxiter, proj)
+	return iterate(lambda x: gauss_seidel_step(U, L, y, x, ** boundary), x0, tol, maxiter, proj)
 
 if __name__ == '__main__':
 	

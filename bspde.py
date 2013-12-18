@@ -229,11 +229,7 @@ class BSPde(object):
 				else:
 					raise NotImplementedError, "iteration not defined for fd scheme %s" % method
 				
-				def project_sol(u):
-					u = proj(t, S, u)
-					fd.set_explicit_boundaries(u, ** bounds)
-					return u
-				u = solver(A, rhs, u, 1e-10, 100, project_sol)
+				u = solver(A, rhs, u, 1e-10, 100, lambda u: proj(t, S, u), ** bounds)
 				
 			else:
 				step = stepsmap[method]
@@ -328,19 +324,27 @@ if __name__ == '__main__':
 	errmax = .6e-2
 	#iteration = None
 	iteration = 'jacobi'
-	#iteration = 'gauss-seidel'
+	iteration = 'gauss-seidel'
 	
-	for CP in "CP":
-		payoff = EuropeanPayoff(K, CP)
-		pde = BSPde(payoff, S, t, r, b, [], sigma, method, iteration = iteration)
-		res = pde.solve(outputs = [ "full_grid" ])
-		V = res['price']
-		Vt = numpy.array(res['full_grid'])
+	settings = [ ]
+	settings.append((None, [ 'explicit' ] * nexpl + [ 'crank-nicolson' ] * (Nt - 1 - nexpl)))
+	settings.append(("jacobi", "implicit"))
+	settings.append(("jacobi", "crank-nicolson"))
+	settings.append(("gauss-seidel", "implicit"))
+	settings.append(("gauss-seidel", "crank-nicolson"))
 		
-		from bs import black_scholes_1973
-		Vref = black_scholes_1973(T, S, sigma, r, b, K, CP)
-		
-		err = l2(V - Vref)
-		print err
-		assert(err < errmax)
-		
+	for iteration, method in settings:
+		for CP in "CP":
+			payoff = EuropeanPayoff(K, CP)
+			pde = BSPde(payoff, S, t, r, b, [], sigma, method, iteration = iteration)
+			res = pde.solve(outputs = [ "full_grid" ])
+			V = res['price']
+			Vt = numpy.array(res['full_grid'])
+			
+			from bs import black_scholes_1973
+			Vref = black_scholes_1973(T, S, sigma, r, b, K, CP)
+			
+			err = l2(V - Vref)
+			print err
+			assert(err < errmax)
+			
