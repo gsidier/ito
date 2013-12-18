@@ -111,13 +111,13 @@ def d2_dx2(x):
 	l = 2 / (k * (h + k))
 	return noboundary(l, d, u)
 
-def solve_explicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
+def solve_explicit(L, c, dt, y, ** bounds):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L y1 + c
 	# y2 = y1 + (L y1 + c) dt
 	dy = dt * (L(y) + c)
 	y2 = y + dy
-	set_explicit_boundaries(y2, dirichlet = dirichlet, neumann = neumann, robin = robin)
+	set_explicit_boundaries(y2, ** bounds)
 	return y2
 
 def set_explicit_boundaries(x, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
@@ -150,14 +150,14 @@ def set_explicit_boundaries(x, dirichlet = (None, None), neumann = (None, None),
 		a, c = robin_hi
 		x[-1] = ((1 - a * .5) * x[-2] - c) / (1 + a * .5)
 
-def solve_implicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
+def solve_implicit(L, c, dt, y, ** bounds):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L y2 + c
 	# y2 - L y2 dt = y1 + c dt
 	# y2 = (I - L dt)-1 (y1 + c dt)
 	op = 1 - dt * L
 	z = y + c * dt
-	set_implicit_boundaries(op, z, dirichlet = dirichlet, neumann = neumann, robin = robin)
+	set_implicit_boundaries(op, z, ** bounds)
 	y2 = op.inv(z) 
 	return y2
 
@@ -192,7 +192,7 @@ def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, Non
 		A.set_boundary_hi(ln = -1, dn = 1)
 		b[-1] = neumann_hi
 
-def solve_crank_nicolson(L, c, dt, y, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
+def solve_crank_nicolson(L, c, dt, y, ** bounds):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L (y1 + y2) / 2 + c
 	# y1 + L y1 dt / 2 + c dt = y2 - L y2 dt / 2
@@ -202,7 +202,7 @@ def solve_crank_nicolson(L, c, dt, y, dirichlet = (None, None), neumann = (None,
 	op1 = 1 + L * dt / 2
 	z1 = op1(y)
 	z2 = z1 + c * dt
-	set_implicit_boundaries(op2, z2, dirichlet = dirichlet, neumann = neumann, robin = robin)
+	set_implicit_boundaries(op2, z2, ** bounds)
 	y2 = op2.inv(z2)
 	return y2
 
