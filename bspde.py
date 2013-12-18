@@ -207,11 +207,11 @@ class BSPde(object):
 				bounds['dirichlet'] = dirichlet_lo, dirichlet_hi
 			if 'neumann' in bounds:
 				neumann_lo, neumann_hi = bounds['neumann']
-				#du/dx = dV/dS du/dV dS/dx = u dV/dS
+				# du = du/dV dV/dS dS/dx dx = exp(x) dV/dS dx
 				if neumann_lo is not None:
-					neumann_lo = u[0] * neumann_lo # tmp!
+					neumann_lo *= .5 * (numpy.exp(x[0]) + numpy.exp(x[1])) * (x[1] - x[0])
 				if neumann_hi is not None:
-					neumann_hi = u[-1] * neumann_hi # tmp!
+					neumann_hi *= .5 * (numpy.exp(x[-1]) + numpy.exp(x[-2])) * (x[-1] - x[-2])
 				bounds['neumann'] = neumann_lo, neumann_hi
 			
 			if self.iteration:
@@ -276,6 +276,17 @@ class AmericanPayoff(VanillaPayoff):
 		V = self.expire(t, S)
 		V[V < Vhold] = Vhold
 		return V
+	
+	def boundary(self, t, S, pde, pdevars):
+		B_t_T = pdevars['B_t_T']
+		if self.CP == 'C':
+			return dict(
+				neumann = (0, 1.)
+			)
+		else:
+			return dict(
+				neumann = (-1., 0)
+			)
 
 class EuropeanPayoff(VanillaPayoff):
 	
@@ -286,11 +297,13 @@ class EuropeanPayoff(VanillaPayoff):
 		B_t_T = pdevars['B_t_T']
 		if self.CP == 'C':
 			return dict(
-				dirichlet = (0., S[-1] - self.K * B_t_T)
+				#dirichlet = (0., S[-1] - self.K * B_t_T)
+				neumann = (0, 1.)
 			)
 		else:
 			return dict(
-				dirichlet = (self.K * B_t_T - S[0], 0.)
+				#dirichlet = (self.K * B_t_T - S[0], 0.)
+				neumann = (-1., 0)
 			)
 
 if __name__ == '__main__':
@@ -318,13 +331,7 @@ if __name__ == '__main__':
 	b = 0
 	
 	nexpl = 20
-	#method = [ 'explicit' ] * nexpl + [ 'crank-nicolson' ] * (Nt - 1 - nexpl)
-	#method = 'explicit'
-	method = 'implicit'
 	errmax = .6e-2
-	#iteration = None
-	iteration = 'jacobi'
-	iteration = 'gauss-seidel'
 	
 	settings = [ ]
 	settings.append((None, [ 'explicit' ] * nexpl + [ 'crank-nicolson' ] * (Nt - 1 - nexpl)))

@@ -191,7 +191,7 @@ def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, Non
 	if neumann_hi:
 		A.set_boundary_hi(ln = -1, dn = 1)
 		b[-1] = neumann_hi
-
+	
 def solve_crank_nicolson(L, c, dt, y, ** bounds):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L (y1 + y2) / 2 + c
