@@ -1,6 +1,9 @@
 import numpy
 import scipy.linalg
 
+def l2(x):
+	return numpy.sqrt(numpy.mean(x * x))
+	
 class FinDiffOp(object):
 	"""
 	Represents the tri-band linear finite difference operator
@@ -108,39 +111,57 @@ def d2_dx2(x):
 	l = 2 / (k * (h + k))
 	return noboundary(l, d, u)
 
-def solve_explicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None)):
+def solve_explicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L y1 + c
 	# y2 = y1 + (L y1 + c) dt
 	dy = dt * (L(y) + c)
 	y2 = y + dy
-	
-	dirichlet_lo, dirichlet_hi = dirichlet
-	if dirichlet_lo:
-		y2[0] = dirichlet_lo
-	if dirichlet_hi:
-		y2[-1] = dirichlet_hi
-	
-	neumann_lo, neumann_hi = neumann
-	if neumann_lo:
-		y2[0] = y2[1] - neumann_lo
-	if neumann_hi:
-		y2[-1] = y2[-2] + neumann_hi
-	
+	set_explicit_boundaries(y2, dirichlet = dirichlet, neumann = neumann, robin = robin)
 	return y2
 
-def solve_implicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None)):
+def set_explicit_boundaries(x, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
+	"""
+	x: the vector to which the boundary condition is applied
+	dirichlet: (lo, hi) value at boundary
+	neumann: (lo, hi) value of x[1] - x[0] or x[-1] - x[-2]
+	robin: pairs ((a_lo, c_lo), (a_hi, c_hi)) such that:
+		a_lo (u[1] + u[0]) / 2 + (u[1] - u[0]) + c_lo = 0
+		a_hi (u[-2] + u[-1]) / 2 + (u[-1] - u[-2]) + c_hi = 0
+	"""
+	
+	dirichlet_lo, dirichlet_hi = dirichlet
+	if dirichlet_lo is not None:
+		x[0] = dirichlet_lo
+	if dirichlet_hi is not None:
+		x[-1] = dirichlet_hi
+	
+	neumann_lo, neumann_hi = neumann
+	if neumann_lo is not None:
+		x[0] = x[1] - neumann_lo
+	if neumann_hi is not None:
+		x[-1] = x[-2] + neumann_hi
+	
+	robin_lo, robin_hi = robin
+	if robin_lo is not None:
+		a, c = robin_lo
+		x[0] = ((1 + a * .5) * x[1] + c) / (1 - a * .5)
+	if robin_hi is not None:
+		a, c = robin_hi
+		x[-1] = ((1 - a * .5) * x[-2] - c) / (1 + a * .5)
+
+def solve_implicit(L, c, dt, y, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L y2 + c
 	# y2 - L y2 dt = y1 + c dt
 	# y2 = (I - L dt)-1 (y1 + c dt)
 	op = 1 - dt * L
 	z = y + c * dt
-	set_implicit_boundaries(op, z, dirichlet = dirichlet, neumann = neumann)
+	set_implicit_boundaries(op, z, dirichlet = dirichlet, neumann = neumann, robin = robin)
 	y2 = op.inv(z) 
 	return y2
 
-def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, None)):
+def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
 	# A x = b
 	# x[0] = x0
 	# x[n] = xn
@@ -171,7 +192,7 @@ def set_implicit_boundaries(A, b, dirichlet = (None, None), neumann = (None, Non
 		A.set_boundary_hi(ln = -1, dn = 1)
 		b[-1] = neumann_hi
 
-def solve_crank_nicolson(L, c, dt, y, dirichlet = (None, None), neumann = (None, None)):
+def solve_crank_nicolson(L, c, dt, y, dirichlet = (None, None), neumann = (None, None), robin = (None, None)):
 	# dy / dt = L y + c
 	# (y2 - y1) / dt = L (y1 + y2) / 2 + c
 	# y1 + L y1 dt / 2 + c dt = y2 - L y2 dt / 2
@@ -181,7 +202,7 @@ def solve_crank_nicolson(L, c, dt, y, dirichlet = (None, None), neumann = (None,
 	op1 = 1 + L * dt / 2
 	z1 = op1(y)
 	z2 = z1 + c * dt
-	set_implicit_boundaries(op2, z2, dirichlet = dirichlet, neumann = neumann)
+	set_implicit_boundaries(op2, z2, dirichlet = dirichlet, neumann = neumann, robin = robin)
 	y2 = op2.inv(z2)
 	return y2
 
@@ -204,7 +225,7 @@ def iterate(step, x0, tol, maxiter, proj = None):
 def jacobi_step(d, UL, y, x0):
 	return (y - UL(x0)) / d
 
-def solve_jacobi(A, y, x0, tol, maxiter):
+def solve_jacobi(A, y, x0, tol, maxiter, proj = None):
 	"""
 	Given A a linear operator and y vector, solve A x = y for x by Jacobi iteration.
 	"""
@@ -212,7 +233,7 @@ def solve_jacobi(A, y, x0, tol, maxiter):
 	ul[1, :] = 0 
 	UL = FinDiffOp(ul)
 	d = A.bands[1, :]
-	return iterate(lambda x: jacobi_step(d, UL, y, x), x0, tol, maxiter)
+	return iterate(lambda x: jacobi_step(d, UL, y, x), x0, tol, maxiter, proj)
 
 def gauss_seidel_step(U, L, y, x0):
 	return U.inv(y - L(x0))
@@ -227,6 +248,14 @@ def solve_gauss_seidel(A, y, x0, tol, maxiter, proj = None):
 	u = A.bands.copy()
 	u[2, :] = 0
 	U = FinDiffOp(u)
+	"""
+	l = A.bands.copy()
+	l[1:, :] = 0 
+	L = FinDiffOp(l)
+	u = A.bands.copy()
+	u[0, :] = 0
+	U = FinDiffOp(u)
+	"""
 	return iterate(lambda x: gauss_seidel_step(U, L, y, x), x0, tol, maxiter, proj)
 
 if __name__ == '__main__':
@@ -328,15 +357,19 @@ if __name__ == '__main__':
 	y2 = solve_gauss_seidel(1 - L * dt, y, y, 1e-8, 100) # y2 = (I - L dt)-1 y
 	print "gauss-seidel: success"
 	# solve crank-nicolson equation by jacobi
+	A = 1 - L * dt / 2
+	rhs = (1 + L * dt / 2)(y)
 	y = phi(x, sigma)
 	dt = .01
-	y2 = solve_jacobi(1 - L * dt / 2, (1 + L * dt / 2)(y), y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	y2 = solve_jacobi(A, rhs, y, 1e-8, 100) # y2 = (I - L dt)-1 y
 	print "jacobi: success"
+	print "l2 err", l2(A(y2) - rhs)
 	# solve crank-nicolson equation by gauss-seidel
 	y = phi(x, sigma)
 	dt = .01
-	y2 = solve_gauss_seidel(1 - L * dt / 2, (1 + L * dt / 2)(y), y, 1e-8, 100) # y2 = (I - L dt)-1 y
+	y2 = solve_gauss_seidel(A, rhs, y, 1e-8, 100) # y2 = (I - L dt)-1 y
 	print "gauss-seidel: success"
+	print "l2 err", l2(A(y2) - rhs)
 	"""
 	# iterative solver for implicit scheme
 	y = phi(x, sigma)

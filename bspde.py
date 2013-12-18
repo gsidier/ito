@@ -12,7 +12,7 @@ class OptionPayoff(object):
 		Return:
 			V: vector of option prices at expiry
 		"""
-		raise NotImplemented
+		raise NotImplementedError
 	
 	def boundary(self, t, S, pde):
 		"""
@@ -27,7 +27,7 @@ class OptionPayoff(object):
 				'neumann': (lo, hi)
 			}
 		"""
-		raise NotImplemented
+		raise NotImplementedError
 	
 	def early_ex(self, t, S, Vhold):
 		"""
@@ -39,7 +39,7 @@ class OptionPayoff(object):
 		Return:
 			V: vector of option prices
 		"""
-		raise NotImplemented
+		raise NotImplementedError
 
 class BSPde(object):
 	"""
@@ -184,7 +184,6 @@ class BSPde(object):
 			'explicit': fd.solve_explicit,
 			'implicit': fd.solve_implicit
 		}
-		steps = [ stepsmap[meth] for meth in self.method ]
 
 		def proj(t, S, u):
 			Vhold = self.u_to_V(u)
@@ -193,13 +192,12 @@ class BSPde(object):
 			return u
 		
 		Vt = [ ]
-		const = numpy.zeros(Nx)
 		
-		for (i, t, tau, dtau, c, k, k_, disc_t, step) in reversed(zip(range(self.Nt - 1), self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_, self.discount, steps)):
+		for (i, t, tau, dtau, c, k, k_, disc_t, method) in reversed(zip(range(self.Nt - 1), self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_, self.discount, self.method)):
 			S = self.x_to_S(i, self.x)
 			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
-			const[:] = 0
 			B_t_T = self.discount[-1] / disc_t
+			Vhold = V
 			
 			bounds = self.payoff.boundary(t, S, self, locals())
 			if 'dirichlet' in bounds:
@@ -222,19 +220,24 @@ class BSPde(object):
 					'gauss-seidel': fd.solve_gauss_seidel,
 				}[self.iteration]
 				
-				if self.method == 'crank-nicolson':
-					rhs = (1 + L * dt / 2)(u)
-					A = (1 + L * dt / 2)
-				elif self.method == 'implicit':
+				if method == 'crank-nicolson':
+					rhs = (1 + L * dtau / 2)(u)
+					A = (1 - L * dtau / 2)
+				elif method == 'implicit':
 					rhs = u
-					A = 1 + L * dt
+					A = 1 - L * dtau
 				else:
-					raise NotImplemented, "iteration not defined for fd scheme %s" % self.method
+					raise NotImplementedError, "iteration not defined for fd scheme %s" % method
 				
-				u = solver(A, rhs, u, 1e-8, 100, lambda u: proj(t, S, u))
+				def project_sol(u):
+					u = proj(t, S, u)
+					fd.set_explicit_boundaries(u, ** bounds)
+					return u
+				u = solver(A, rhs, u, 1e-10, 100, project_sol)
 				
 			else:
-				u = step(L, const, dtau, u, ** bounds)
+				step = stepsmap[method]
+				u = step(L, 0, dtau, u, ** bounds)
 				u = proj(t, S, u)
 			
 			V = self.u_to_V(u)
@@ -269,7 +272,7 @@ class VanillaPayoff(object):
 		return V
 	
 	def boundary(self, t, S, pde, pdevars):
-		raise NotImplemented
+		raise NotImplementedError
 
 class AmericanPayoff(VanillaPayoff):
 	
@@ -319,27 +322,25 @@ if __name__ == '__main__':
 	b = 0
 	
 	nexpl = 20
-	method = [ 'explicit' ] * nexpl + [ 'crank-nicolson' ] * (Nt - 1 - nexpl)
+	#method = [ 'explicit' ] * nexpl + [ 'crank-nicolson' ] * (Nt - 1 - nexpl)
 	#method = 'explicit'
+	method = 'implicit'
+	errmax = .6e-2
+	#iteration = None
+	iteration = 'jacobi'
+	#iteration = 'gauss-seidel'
 	
-	payoff = EuropeanPayoff(K, 'C')
-	pde = BSPde(payoff, S, t, r, b, [], sigma, method)
-	res = pde.solve(outputs = [ "full_grid" ])
-	V = res['price']
-	Vt = numpy.array(res['full_grid'])
-	
-	from bs import black_scholes_1973
-	Vref = black_scholes_1973(T, S, sigma, r, b, K, 'C')
-	
-	assert(l2(V - Vref) < .6e-2)
-	
-	payoff = EuropeanPayoff(K, 'P')
-	pde = BSPde(payoff, S, t, r, b, [], sigma, method)
-	res = pde.solve(outputs = [ "full_grid" ])
-	V = res['price']
-	Vt = numpy.array(res['full_grid'])
-	
-	from bs import black_scholes_1973
-	Vref = black_scholes_1973(T, S, sigma, r, b, K, 'P')
-	
-	assert(l2(V - Vref) < .6e-2)
+	for CP in "CP":
+		payoff = EuropeanPayoff(K, CP)
+		pde = BSPde(payoff, S, t, r, b, [], sigma, method, iteration = iteration)
+		res = pde.solve(outputs = [ "full_grid" ])
+		V = res['price']
+		Vt = numpy.array(res['full_grid'])
+		
+		from bs import black_scholes_1973
+		Vref = black_scholes_1973(T, S, sigma, r, b, K, CP)
+		
+		err = l2(V - Vref)
+		print err
+		assert(err < errmax)
+		
