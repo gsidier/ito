@@ -192,6 +192,8 @@ class BSPde(object):
 			return u
 		
 		Vt = [ ]
+		St = [ ]
+		ut = [ ]
 		
 		for (i, t, tau, dtau, c, k, k_, disc_t, method) in reversed(zip(range(self.Nt - 1), self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_, self.discount, self.method)):
 			S = self.x_to_S(i, self.x)
@@ -239,12 +241,36 @@ class BSPde(object):
 			V = self.u_to_V(u)
 			if 'full_grid' in outputs:
 				Vt.append(V)
+				St.append(S)
+				ut.append(u)
 		
 		V = self.u_to_V(u)
-		res['price'] = V
 		if 'full_grid' in outputs:
-			Vt = Vt[::-1]
-			res['full_grid'] = Vt
+			V = numpy.array(Vt[::-1])
+			S = numpy.array(St[::-1])
+			u = numpy.array(ut[::-1])
+		
+		res['price'] = V
+		
+		if 'delta' in outputs or 'gamma' in outputs:
+			d_dx = fd.d_dx(self.x)
+			du_dx = d_dx(u)
+		
+		if 'delta' in outputs:
+			# x = log(S/X0): dx/dS = 1/S
+			# dV/dS = dV/du du/dx dx/dS = X0/S du/dx
+			delta = du_dx * self.X0 / S
+			delta[0] = delta[1]
+			delta[-1] = delta[-2]
+			res['delta'] = delta
+		
+		if 'gamma' in outputs:
+			d2_dx2 = fd.d2_dx2(self.x)
+			d2u_dx2 = d2_dx2(u)
+			# d2V/dS2 = d(X0/S du/dx)/dS = -X0/S**2 du/dx + X0/S d2u/dx2 dx/dS = X0/S**2(d2u/dx2 - du/dx)
+			gamma = self.X0 / (self.S * self.S) * (d2u_dx2 - du_dx)
+			gamma[0] = gamma[-1] = 0
+			res['gamma'] = gamma
 		
 		if outputs:
 			return res
@@ -344,12 +370,17 @@ if __name__ == '__main__':
 		for CP in "CP":
 			payoff = EuropeanPayoff(K, CP)
 			pde = BSPde(payoff, S, t, r, b, [], sigma, method, iteration = iteration)
-			res = pde.solve(outputs = [ "full_grid" ])
+			#res = pde.solve(outputs = [ 'full_grid', "delta" ])
+			res = pde.solve(outputs = [ "delta", "gamma" ])
 			V = res['price']
-			Vt = numpy.array(res['full_grid'])
+			delta = res['delta']
+			gamma = res['gamma']
 			
 			from bs import black_scholes_1973
-			Vref = black_scholes_1973(T, S, sigma, r, b, K, CP)
+			bs = black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = ["delta", "gamma"])
+			Vref = bs['price']
+			deltaref = bs['delta']
+			gammaref = bs['gamma']
 			
 			err = l2(V - Vref)
 			print err

@@ -83,6 +83,15 @@ def noboundary(l, d, u):
 	return FinDiffOp(bands)
 
 def d_dx(x):
+	"""
+	Return the FinDiffOp that computes d/dx.
+	
+	x does not have to be evenly spaced. Three-point differences are computed
+	with O(epsilon(h + k) + h3 + k3) precision where h is x[i] - x[i - 1] and k is x[i + 1] - x[i]
+	and epsilon = |h - k|.
+	
+	The one-sided differentials are computed on the edge of the domain.
+	"""
 	# h - k = epsilon
 	# f(x + h) = f + h f' + h2/2 f'' + h3/6 f''' + O(h4)
 	# f(x - k) = f - k f' + k2/2 f'' - k3/6 f''' + O(k4)
@@ -95,7 +104,10 @@ def d_dx(x):
 	d = (h - k) / (k * h)
 	u = k / (h * (h + k))
 	l = - h / (k * (h + k))
-	return noboundary(l, d, u)
+	res = noboundary(l, d, u)
+	res.set_boundary_lo(d0 = -1. / (x[1] - x[0]), u0 = +1. / (x[1] - x[0]))
+	res.set_boundary_hi(dn = +1. / (x[-1] - x[-2]), ln = -1. / (x[-1] - x[-2]))
+	return res
 	
 def d2_dx2(x):
 	# h - k = epsilon
