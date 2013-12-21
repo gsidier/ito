@@ -79,6 +79,12 @@ class BSPde(object):
 			c = (sigma' / sigma)2
 			k = 2 r / sigma'2
 			k' = 2 b / sigma'2
+	
+	Cash dividends:
+	
+		X = X0 exp(x)
+		Dt = sum[ti > = t] B(t, ti) di
+		St = Xt + Dt
 	"""
 	
 	def __init__(self, payoff, S, t, r, b, divs, sigma, method = 'implicit', iteration = None):
@@ -249,8 +255,11 @@ class BSPde(object):
 			V = numpy.array(Vt[::-1])
 			S = numpy.array(St[::-1])
 			u = numpy.array(ut[::-1])
+			pde.St = S
+			pde.ut = u
 		
 		res['price'] = V
+		
 		
 		if 'delta' in outputs or 'gamma' in outputs:
 			d_dx = fd.d_dx(self.x)
@@ -343,7 +352,7 @@ if __name__ == '__main__':
 	def linf(x):
 		return numpy.max(numpy.abs(x))
 	
-	S0 = 100.
+	X0 = 100.
 	K = 100.
 	Nx = 101
 	Nt = 101
@@ -352,9 +361,12 @@ if __name__ == '__main__':
 	T = .25
 	t = numpy.linspace(0, T, Nt)
 	x = sns * sigma * numpy.sqrt(T)
-	S = S0 * numpy.exp(x)
+	X = X0 * numpy.exp(x)
 	r = 0.02
 	b = 0
+	divs = [(1. / 12., 10.)]
+	D = sum(numpy.exp(- r * ti) * di for (ti, di) in divs)
+	S = X + D
 	
 	nexpl = 20
 	errmax = .6e-2
@@ -365,19 +377,25 @@ if __name__ == '__main__':
 	settings.append(("jacobi", "crank-nicolson"))
 	settings.append(("gauss-seidel", "implicit"))
 	settings.append(("gauss-seidel", "crank-nicolson"))
-		
+	
+	full_grid = 1
+	
 	for iteration, method in settings:
 		for CP in "CP":
 			payoff = EuropeanPayoff(K, CP)
-			pde = BSPde(payoff, S, t, r, b, [], sigma, method, iteration = iteration)
-			#res = pde.solve(outputs = [ 'full_grid', "delta" ])
-			res = pde.solve(outputs = [ "delta", "gamma" ])
-			V = res['price']
-			delta = res['delta']
-			gamma = res['gamma']
+			pde = BSPde(payoff, S, t, r, b, divs, sigma, method, iteration = iteration)
+			if full_grid:
+				res = pde.solve(outputs = [ 'full_grid' ])
+				Vt = res['price']
+				V = Vt[0, :]
+			else:
+				res = pde.solve(outputs = [ "delta", "gamma" ])
+				V = res['price']
+				delta = res['delta']
+				gamma = res['gamma']
 			
 			from bs import black_scholes_1973
-			bs = black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = ["delta", "gamma"])
+			bs = black_scholes_1973(T, X, sigma, r, b, K, CP, greeks = ["delta", "gamma"])
 			Vref = bs['price']
 			deltaref = bs['delta']
 			gammaref = bs['gamma']
