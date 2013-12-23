@@ -108,7 +108,7 @@ class BSPde(object):
 		self.divs = divs
 		self.sigma = sigma + numpy.zeros(self.Nt - 1)
 		if isinstance(method, (str, unicode)):
-			self.method = [ method ] * (Nt - 1)
+			self.method = [ method ] * (self.Nt - 1)
 		else:
 			self.method = method
 		self.iteration = iteration
@@ -217,9 +217,9 @@ class BSPde(object):
 				neumann_lo, neumann_hi = bounds['neumann']
 				# du = du/dV dV/dS dS/dx dx = exp(x) dV/dS dx
 				if neumann_lo is not None:
-					neumann_lo *= .5 * (numpy.exp(x[0]) + numpy.exp(x[1])) * (x[1] - x[0])
+					neumann_lo *= .5 * (numpy.exp(self.x[0]) + numpy.exp(self.x[1])) * (self.x[1] - self.x[0])
 				if neumann_hi is not None:
-					neumann_hi *= .5 * (numpy.exp(x[-1]) + numpy.exp(x[-2])) * (x[-1] - x[-2])
+					neumann_hi *= .5 * (numpy.exp(self.x[-1]) + numpy.exp(self.x[-2])) * (self.x[-1] - self.x[-2])
 				bounds['neumann'] = neumann_lo, neumann_hi
 			
 			if self.iteration:
@@ -255,8 +255,8 @@ class BSPde(object):
 			V = numpy.array(Vt[::-1])
 			S = numpy.array(St[::-1])
 			u = numpy.array(ut[::-1])
-			pde.St = S
-			pde.ut = u
+			self.St = S
+			self.ut = u
 		
 		res['price'] = V
 		
@@ -296,9 +296,9 @@ class VanillaPayoff(object):
 		
 	def expire(self, t, S):
 		if self.CP == 'C':
-			V = (S - K)
+			V = (S - self.K)
 		else:
-			V = (K - S)
+			V = (self.K - S)
 		V[V <= 0] = 0
 		return V
 	
@@ -309,7 +309,8 @@ class AmericanPayoff(VanillaPayoff):
 	
 	def early_ex(self, t, S, Vhold):
 		V = self.expire(t, S)
-		V[V < Vhold] = Vhold
+		hold = V < Vhold
+		V[hold] = Vhold[hold]
 		return V
 	
 	def boundary(self, t, S, pde, pdevars):
