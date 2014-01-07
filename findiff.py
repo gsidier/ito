@@ -218,7 +218,7 @@ def solve_crank_nicolson(L, c, dt, y, ** bounds):
 	y2 = op2.inv(z2)
 	return y2
 
-def iterate(step, x0, tol, maxiter, proj = None):
+def iterate(step, x0, tol, maxiter, proj = None, callback = None):
 	"""
 	Perform a iteration step until convergence, or we run out of iterations.
 	"""
@@ -227,7 +227,8 @@ def iterate(step, x0, tol, maxiter, proj = None):
 	else:
 		step1 = step
 	for _ in xrange(maxiter):
-		print ".", 
+		if callback:
+			callback()
 		x = step1(x0)
 		if l2(x - x0) <= tol:
 			return x
