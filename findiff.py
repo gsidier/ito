@@ -40,6 +40,15 @@ class FinDiffOp(object):
 		self.bands[1, -1] = dn
 	
 	def __call__(self, y):
+		shape = (1,) * (numpy.ndim(y) - 1) + (numpy.shape(y)[-1],)
+		z = [ band.reshape(shape) * y for band in self.bands ]
+		res = z[1]
+		s = [ slice(None) ] * (z[0].ndim - 1)
+		res[s + [ slice(None, -1) ]] += z[0][s + [ slice(1, None) ]]
+		res[s + [ slice(1, None) ]] += z[2][s + [ slice(None, -1) ]]
+		return res
+	
+	def __call__bak__(self, y):
 		z = self.bands * y
 		res = z[1, :]
 		res[:-1] += z[0, 1:]
@@ -228,7 +237,7 @@ def iterate(step, x0, tol, maxiter, proj = None, callback = None):
 		step1 = step
 	for _ in xrange(maxiter):
 		if callback:
-			callback()
+			callback(locals())
 		x = step1(x0)
 		if l2(x - x0) <= tol:
 			return x
