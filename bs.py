@@ -39,17 +39,22 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 		res['price'] = V
 	else:
 		res = V
-	if 'delta' in greeks:
+	if 'delta' in greeks or 'theta' in greeks:
 		if CP == 'C':
 			delta = exp(- b * T) * N(d1)
 		else:
 			delta = - exp(- b * T) * N(- d1)
+	if 'delta' in greeks:
 		res['delta'] = delta
-	if 'gamma' in greeks:
+	if 'gamma' in greeks or 'theta' in greeks:
 		gamma = exp(- b * T) * phi(d1) / (S * sigma_sqrtT)
+	if 'gamma' in greeks:
 		res['gamma'] = gamma
 	if 'vega' in greeks:
 		vega = S * numpy.exp(- b * T) * phi(d1) * numpy.sqrt(T)
 		res['vega'] = vega
+	if 'theta' in greeks:
+		theta = r * V - (r - b) * delta * S - .5 * gamma * S * S * sigma * sigma
+		res['theta'] = theta
 	return res
 
