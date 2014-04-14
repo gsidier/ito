@@ -2,6 +2,10 @@ import numpy
 from numpy import log, exp, sqrt
 from scipy.stats import norm
 
+_VOMMA = 'vomma volga dvegadvol'.split()
+_VANNA = 'vanna dvegadspot ddeltadvol'.split()
+_ZOMMA = 'zomma dgammadvol'.split()
+
 def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 	"""
 	greeks: a list of optional outputs:
@@ -14,6 +18,7 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 	output: a dict containing the key 'price' and any greeks specified in input.
 	"""
 	res = { }
+	greeks = set(greeks)
 	F = S * exp((r - b) * T)
 	if 'forward' in greeks:
 		res['forward'] = F
@@ -46,15 +51,31 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 			delta = - exp(- b * T) * N(- d1)
 	if 'delta' in greeks:
 		res['delta'] = delta
-	if 'gamma' in greeks or 'theta' in greeks:
+	if any(g in greeks for g in "gamma theta zomma dgammadvol".split()):
 		gamma = exp(- b * T) * phi(d1) / (S * sigma_sqrtT)
 	if 'gamma' in greeks:
 		res['gamma'] = gamma
-	if 'vega' in greeks:
+	if any(g in greeks for g in 'vega vomma volga dvegadvol vanna dvegadspot ddeltadvol'.split()):
 		vega = S * numpy.exp(- b * T) * phi(d1) * numpy.sqrt(T)
+	if 'vega' in greeks:
 		res['vega'] = vega
 	if 'theta' in greeks:
 		theta = r * V - (r - b) * delta * S - .5 * gamma * S * S * sigma * sigma
 		res['theta'] = theta
+	if any(g in greeks for g in _VOMMA):
+		volga = vega * d1 * d2 / sigma
+		for g in VOMMA:
+			if g in greeks:
+				res[g] = volga
+	if any(g in greeks for g in _VANNA):
+		vanna = vega / S * (1 - d1 / sigma_sqrtT)
+		for g in _VANNA:
+			if g in greeks:
+				res[g] = vanna
+	if any(g in greeks for g in _ZOMMA):
+		zomma = gamma * (d1 * d2 - 1) / sigma
+		for g in _ZOMMA:
+			if g in greeks:
+				res[g] = zomma
 	return res
 
