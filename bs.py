@@ -51,11 +51,11 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 			delta = - exp(- b * T) * N(- d1)
 	if 'delta' in greeks:
 		res['delta'] = delta
-	if any(g in greeks for g in "gamma theta zomma dgammadvol".split()):
+	if 'gamma' in greeks or 'theta' in greeks or any(g in greeks for g in _ZOMMA):
 		gamma = exp(- b * T) * phi(d1) / (S * sigma_sqrtT)
 	if 'gamma' in greeks:
 		res['gamma'] = gamma
-	if any(g in greeks for g in 'vega vomma volga dvegadvol vanna dvegadspot ddeltadvol'.split()):
+	if vega in greeks or any(g in greeks for g in _VOMMA) or any(g in greeks for g in _VANNA):
 		vega = S * numpy.exp(- b * T) * phi(d1) * numpy.sqrt(T)
 	if 'vega' in greeks:
 		res['vega'] = vega
