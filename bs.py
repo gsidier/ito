@@ -55,7 +55,7 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 		gamma = exp(- b * T) * phi(d1) / (S * sigma_sqrtT)
 	if 'gamma' in greeks:
 		res['gamma'] = gamma
-	if vega in greeks or any(g in greeks for g in _VOMMA) or any(g in greeks for g in _VANNA):
+	if 'vega' in greeks or any(g in greeks for g in _VOMMA) or any(g in greeks for g in _VANNA):
 		vega = S * numpy.exp(- b * T) * phi(d1) * numpy.sqrt(T)
 	if 'vega' in greeks:
 		res['vega'] = vega
@@ -64,7 +64,7 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 		res['theta'] = theta
 	if any(g in greeks for g in _VOMMA):
 		volga = vega * d1 * d2 / sigma
-		for g in VOMMA:
+		for g in _VOMMA:
 			if g in greeks:
 				res[g] = volga
 	if any(g in greeks for g in _VANNA):
