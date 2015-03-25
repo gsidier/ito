@@ -6,7 +6,7 @@ _VOMMA = 'vomma volga dvegadvol'.split()
 _VANNA = 'vanna dvegadspot ddeltadvol'.split()
 _ZOMMA = 'zomma dgammadvol'.split()
 
-def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
+def bs1973(T, S, sigma, r, b, K, CP, greeks = []):
 	"""
 	greeks: a list of optional outputs:
 		delta
@@ -93,3 +93,4 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 				res[g] = zomma
 	return res
 
+black_scholes_1973 = bs1973
