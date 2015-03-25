@@ -11,14 +11,24 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 	greeks: a list of optional outputs:
 		delta
 		gamma
+		vega
+		theta
+		rho
 		forward
 		d1
 		d2
+		vanna / dvegadspot / ddeltadvol
+		volga / vomma / dvegadvol
+		zomma / dgammadvol
+	
+	'greeks' can also be input as simple string eg "delta vega gamma".
 	
 	output: a dict containing the key 'price' and any greeks specified in input.
 	"""
-	res = { }
+	if hasattr(greeks, 'split'):
+		greeks = greeks.split()
 	greeks = set(greeks)
+	res = { }
 	F = S * exp((r - b) * T)
 	if 'forward' in greeks:
 		res['forward'] = F
@@ -35,8 +45,10 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 	phi = norm.pdf
 	CP = str(CP)[0].upper()
 	if CP == 'C':
+		sgn = +1
 		V = exp(- r * T) * (F * N(d1) - K * N(d2))
 	elif CP == 'P':
+		sgn = -1
 		V = exp(- r * T) * (K * N(- d2) - F * N(- d1))
 	else:
 		raise ValueError, "Bad value for 'CP' parameter: " + CP
@@ -62,6 +74,8 @@ def black_scholes_1973(T, S, sigma, r, b, K, CP, greeks = []):
 	if 'theta' in greeks:
 		theta = r * V - (r - b) * delta * S - .5 * gamma * S * S * sigma * sigma
 		res['theta'] = theta
+	if 'rho' in greeks:
+		res['rho'] = sgn * K * T * exp(- r * T) * N(sgn * d2)
 	if any(g in greeks for g in _VOMMA):
 		volga = vega * d1 * d2 / sigma
 		for g in _VOMMA:
