@@ -51,7 +51,7 @@ def bs1973(T, S, sigma, r, b, K, CP, greeks = []):
 		sgn = -1
 		V = exp(- r * T) * (K * N(- d2) - F * N(- d1))
 	else:
-		raise ValueError, "Bad value for 'CP' parameter: " + CP
+		raise ValueError("Bad value for 'CP' parameter: " + CP)
 	if greeks:
 		res['price'] = V
 	else:

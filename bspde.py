@@ -1,5 +1,6 @@
+from __future__ import print_function
 import __init__
-import numpy
+import numpy as np
 import ito.findiff as fd
 
 class OptionPayoff(object):
@@ -12,7 +13,7 @@ class OptionPayoff(object):
 		Return:
 			V: vector of option prices at expiry
 		"""
-		raise NotImplementedError
+		raise NotImplementedError()
 	
 	def boundary(self, t, S, pde):
 		"""
@@ -27,7 +28,7 @@ class OptionPayoff(object):
 				'neumann': (lo, hi)
 			}
 		"""
-		raise NotImplementedError
+		raise NotImplementedError()
 	
 	def early_ex(self, t, S, Vhold):
 		"""
@@ -39,7 +40,7 @@ class OptionPayoff(object):
 		Return:
 			V: vector of option prices
 		"""
-		raise NotImplementedError
+		raise NotImplementedError()
 
 class BSPde(object):
 	"""
@@ -85,6 +86,7 @@ class BSPde(object):
 		X = X0 exp(x)
 		Dt = sum[ti > = t] B(t, ti) di
 		St = Xt + Dt
+		dX / X = (r - b) dt + sigma dW
 	"""
 	
 	def __init__(self, payoff, S, t, r, b, divs, sigma, method = 'implicit', iteration = None):
@@ -103,17 +105,18 @@ class BSPde(object):
 		self.payoff = payoff
 		self.S = S
 		self.t = t
-		self.r = r + numpy.zeros(self.Nt - 1)
-		self.b = b + numpy.zeros(self.Nt - 1)
+		self.r = r + np.zeros(self.Nt - 1)
+		self.b = b + np.zeros(self.Nt - 1)
 		self.divs = divs
-		self.sigma = sigma + numpy.zeros(self.Nt - 1)
-		if isinstance(method, (str, unicode)):
+		self.sigma = sigma + np.zeros(self.Nt - 1)
+		#if isinstance(method, (str, unicode)):
+		if isinstance(method, str):
 			self.method = [ method ] * (self.Nt - 1)
 		else:
 			self.method = method
 		self.iteration = iteration
-		self.discount = numpy.insert(numpy.cumprod([numpy.exp(- rt * dt) for (rt, dt) in zip(self.r[:len(self.t) - 1], self.t[1:] - self.t[:-1]) ]
-				), 0, 1.) ## numpy.exp(- r * t)
+		self.discount = np.insert(np.cumprod([np.exp(- rt * dt) for (rt, dt) in zip(self.r[:len(self.t) - 1], self.t[1:] - self.t[:-1]) ]
+				), 0, 1.) ## np.exp(- r * t)
 		
 		# S = X + D
 		# Dt = sum[ti >= t] B(t, ti) * di
@@ -130,15 +133,15 @@ class BSPde(object):
 				else:
 					break
 			divs_t.append(x)
-		sumdivs_t = numpy.cumsum(divs_t[::-1])[::-1]
+		sumdivs_t = np.cumsum(divs_t[::-1])[::-1]
 		self.D = sumdivs_t / self.discount
 		
-		self.X0 = S[len(S) / 2] - self.D[0]
+		self.X0 = S[int(len(S) / 2)] - self.D[0]
 		t0 = t[0]
 		self.x = self.S_to_x(0, S)
 		self.T = t[-1]
 		dtau = (t[1:] - t[:-1]) * self.sigma * self.sigma / 2
-		self.tau = numpy.append(numpy.cumsum(dtau[::-1])[::-1], 0)
+		self.tau = np.append(np.cumsum(dtau[::-1])[::-1], 0)
 	
 	def S_to_x(self, i, S):
 		return self.X_to_x(S - self.D[i]) 
@@ -147,10 +150,10 @@ class BSPde(object):
 		return self.x_to_X(x) + self.D[i]
 	
 	def X_to_x(self, X):
-		return numpy.log(X / self.X0)
+		return np.log(X / self.X0)
 	
 	def x_to_X(self, x):
-		return self.X0 * numpy.exp(x)
+		return self.X0 * np.exp(x)
 	
 	def u_to_V(self, u):
 		return self.X0 * u
@@ -178,7 +181,7 @@ class BSPde(object):
 		if sigma is None:
 			sigma = self.sigma
 		else:
-			sigma = sigma + numpy.zeros(self.Nt - 1)
+			sigma = sigma + np.zeros(self.Nt - 1)
 		S = self.x_to_S(-1, self.x)
 		V = self.payoff.expire(self.T, S)
 		u = self.V_to_u(V)
@@ -201,7 +204,7 @@ class BSPde(object):
 		St = [ ]
 		ut = [ ]
 		
-		for (i, t, tau, dtau, c, k, k_, disc_t, method) in reversed(zip(range(self.Nt - 1), self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_, self.discount, self.method)):
+		for (i, t, tau, dtau, c, k, k_, disc_t, method) in reversed(list(zip(range(self.Nt - 1), self.t[:-1], self.tau[:-1], self.tau[:-1] - self.tau[1:], C, K, K_, self.discount, self.method))):
 			S = self.x_to_S(i, self.x)
 			L = - k * c + (k - k_ - 1) * c * fd.d_dx(self.x) + c * fd.d2_dx2(self.x)
 			B_t_T = self.discount[-1] / disc_t
@@ -217,9 +220,9 @@ class BSPde(object):
 				neumann_lo, neumann_hi = bounds['neumann']
 				# du = du/dV dV/dS dS/dx dx = exp(x) dV/dS dx
 				if neumann_lo is not None:
-					neumann_lo *= .5 * (numpy.exp(self.x[0]) + numpy.exp(self.x[1])) * (self.x[1] - self.x[0])
+					neumann_lo *= .5 * (np.exp(self.x[0]) + np.exp(self.x[1])) * (self.x[1] - self.x[0])
 				if neumann_hi is not None:
-					neumann_hi *= .5 * (numpy.exp(self.x[-1]) + numpy.exp(self.x[-2])) * (self.x[-1] - self.x[-2])
+					neumann_hi *= .5 * (np.exp(self.x[-1]) + np.exp(self.x[-2])) * (self.x[-1] - self.x[-2])
 				bounds['neumann'] = neumann_lo, neumann_hi
 			
 			if self.iteration:
@@ -235,7 +238,7 @@ class BSPde(object):
 					rhs = u
 					A = 1 - L * dtau
 				else:
-					raise NotImplementedError, "iteration not defined for fd scheme %s" % method
+					raise NotImplementedError("iteration not defined for fd scheme %s" % method)
 				
 				u = solver(A, rhs, u, 1e-10, 100, lambda u: proj(t, S, u), ** bounds)
 				
@@ -252,11 +255,10 @@ class BSPde(object):
 		
 		V = self.u_to_V(u)
 		if 'full_grid' in outputs:
-			V = numpy.array(Vt[::-1])
-			S = numpy.array(St[::-1])
-			u = numpy.array(ut[::-1])
-			self.St = S
-			self.ut = u
+			V = np.array(Vt[::-1])
+			self.Vt = Vt
+			self.St = np.array(St[::-1])
+			self.ut = np.array(ut[::-1])
 		
 		res['price'] = V
 		
@@ -265,13 +267,14 @@ class BSPde(object):
 			d_dx = fd.d_dx(self.x)
 			du_dx = d_dx(u)
 		
-		if 'delta' in outputs:
+		if 'delta' in outputs or 'vanna' in outputs:
 			# x = log(S/X0): dx/dS = 1/S
 			# dV/dS = dV/du du/dx dx/dS = X0/S du/dx
-			delta = du_dx * self.X0 / S
+			delta = du_dx * self.X0 / self.S
 			delta[0] = delta[1]
 			delta[-1] = delta[-2]
-			res['delta'] = delta
+			if 'delta' in outputs:
+				res['delta'] = delta
 		
 		if 'gamma' in outputs:
 			d2_dx2 = fd.d2_dx2(self.x)
@@ -280,6 +283,24 @@ class BSPde(object):
 			gamma = self.X0 / (self.S * self.S) * (d2u_dx2 - du_dx)
 			gamma[0] = gamma[-1] = 0
 			res['gamma'] = gamma
+		
+		if any(volgreek in outputs for volgreek in "vega volga vanna".split()):
+			outputs1 = ['price']
+			if 'vanna' in outputs:
+				outputs1.append('delta')
+			dsigma = sigma[0] * 1e-2
+			outPlus = self.solve(sigma=sigma+dsigma, outputs=outputs1)
+			outMinus = self.solve(sigma=sigma-dsigma, outputs=outputs1)
+			Vplus = outPlus['price']
+			Vminus = outMinus['price']
+			if 'vega' in outputs:
+				res['vega'] = (Vplus - Vminus) / (2 * dsigma)
+			if 'volga' in outputs:
+				res['volga'] = (Vplus - 2*V + Vminus) / (dsigma*dsigma)
+			if 'vanna' in outputs:
+				deltaPlus = outPlus['delta']
+				deltaMinus = outMinus['delta']
+				res['vanna'] = (deltaPlus - deltaMinus) / (2*dsigma)
 		
 		if outputs:
 			return res
@@ -292,7 +313,7 @@ class VanillaPayoff(object):
 		self.K = K
 		self.CP = str(CP)[0].upper()
 		if self.CP not in "CP":
-			raise ValueError, "Unrecognized call/put flag: " + CP
+			raise ValueError("Unrecognized call/put flag: " + CP)
 		
 	def expire(self, t, S):
 		if self.CP == 'C':
@@ -303,7 +324,7 @@ class VanillaPayoff(object):
 		return V
 	
 	def boundary(self, t, S, pde, pdevars):
-		raise NotImplementedError
+		raise NotImplementedError()
 
 class AmericanPayoff(VanillaPayoff):
 	
@@ -342,31 +363,43 @@ class EuropeanPayoff(VanillaPayoff):
 				neumann = (-1., 0)
 			)
 
+def genPriceGrid(S0, sigma, Texp, divs, r, nstd, Nx):
+	sns = np.linspace(-nstd, +nstd, Nx)
+	x = sns * sigma * np.sqrt(Texp)
+	D = sum(np.exp(- r * ti) * di for (ti, di) in divs)
+	X0 = S0 - D
+	X = X0 * np.exp(x)
+	S = X + D
+	return S
+
+def genTimeGrid(Texp, Nt):
+	return np.linspace(0, Texp, Nt)
+
 if __name__ == '__main__':
 	
 	def l1(x):
-		return numpy.mean(numpy.abs(x))
+		return np.mean(np.abs(x))
 	
 	def l2(x):
-		return numpy.sqrt(numpy.mean(x * x))
+		return np.sqrt(np.mean(x * x))
 	
 	def linf(x):
-		return numpy.max(numpy.abs(x))
+		return np.max(np.abs(x))
 	
 	X0 = 100.
 	K = 100.
 	Nx = 101
 	Nt = 101
-	sns = numpy.linspace(-6, +6, Nx)
+	sns = np.linspace(-6, +6, Nx)
 	sigma = .3
 	T = .25
-	t = numpy.linspace(0, T, Nt)
-	x = sns * sigma * numpy.sqrt(T)
-	X = X0 * numpy.exp(x)
+	t = np.linspace(0, T, Nt)
+	x = sns * sigma * np.sqrt(T)
+	X = X0 * np.exp(x)
 	r = 0.02
 	b = 0
 	divs = [(1. / 12., 10.)]
-	D = sum(numpy.exp(- r * ti) * di for (ti, di) in divs)
+	D = sum(np.exp(- r * ti) * di for (ti, di) in divs)
 	S = X + D
 	
 	nexpl = 20
@@ -402,6 +435,6 @@ if __name__ == '__main__':
 			gammaref = bs['gamma']
 			
 			err = l2(V - Vref)
-			print err
+			print(err)
 			assert(err < errmax)
 			

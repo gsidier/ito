@@ -44,8 +44,8 @@ class FinDiffOp(object):
 		z = [ band.reshape(shape) * y for band in self.bands ]
 		res = z[1]
 		s = [ slice(None) ] * (z[0].ndim - 1)
-		res[s + [ slice(None, -1) ]] += z[0][s + [ slice(1, None) ]]
-		res[s + [ slice(1, None) ]] += z[2][s + [ slice(None, -1) ]]
+		res[tuple(s + [ slice(None, -1) ])] += z[0][tuple(s + [ slice(1, None) ])]
+		res[tuple(s + [ slice(1, None) ])] += z[2][tuple(s + [ slice(None, -1) ])]
 		return res
 	
 	def __call__bak__(self, y):
@@ -63,6 +63,9 @@ class FinDiffOp(object):
 	
 	def __div__(self, k):
 		return self * (1. / k)
+	
+	def __truediv__(self, k):
+		return self.__div__(k)
 	
 	def __add__(self, op):
 		return FinDiffOp(self.bands + op.bands)
@@ -242,7 +245,7 @@ def iterate(step, x0, tol, maxiter, proj = None, callback = None):
 		if l2(x - x0) <= tol:
 			return x
 		x0 = x
-	raise RuntimeError, "Convergence failed."
+	raise RuntimeError("Convergence failed.")
 
 def jacobi_step(d, UL, y, x0):
 	return (y - UL(x0)) / d
@@ -335,11 +338,11 @@ if __name__ == '__main__':
 		u = phi(x, sigma_t)
 		assert eq(y, u, 1e-3)
 		assert l2(y - u) < 1e-4
-	print "explicit:"
-	print "l1:", l1(y - u)
-	print "l2:", l2(y - u)
-	print "linf:", linf(y - u)
-	print
+	print("explicit:")
+	print("l1:", l1(y - u))
+	print("l2:", l2(y - u))
+	print("linf:", linf(y - u))
+	print()
 	# implicit
 	y = phi(x, sigma)
 	Yt = [ y ]
@@ -352,11 +355,11 @@ if __name__ == '__main__':
 		u = phi(x, sigma_t)
 		assert eq(y, u, 1e-3)
 		assert l2(y - u) < 1e-4
-	print "implicit:"
-	print "l1:", l1(y - u)
-	print "l2:", l2(y - u)
-	print "linf:", linf(y - u)
-	print
+	print("implicit:")
+	print("l1:", l1(y - u))
+	print("l2:", l2(y - u))
+	print("linf:", linf(y - u))
+	print()
 	# crank-nicolson
 	y = phi(x, sigma)
 	Yt = [ y ]
@@ -369,35 +372,35 @@ if __name__ == '__main__':
 		u = phi(x, sigma_t)
 		assert eq(y, u, 1e-3)
 		assert l2(y - u) < 1e-4
-	print "crank-nicolson:"
-	print "l1:", l1(y - u)
-	print "l2:", l2(y - u)
-	print "linf:", linf(y - u)
-	print
+	print("crank-nicolson:")
+	print("l1:", l1(y - u))
+	print("l2:", l2(y - u))
+	print("linf:", linf(y - u))
+	print()
 	# solve implicit equation by jacobi
 	y = phi(x, sigma)
 	dt = .01
 	y2 = solve_jacobi(1 - L * dt, y, y, 1e-8, 100) # y2 = (I - L dt)-1 y
-	print "jacobi: success"
+	print("jacobi: success")
 	# solve implicit equation by gauss-seidel
 	y = phi(x, sigma)
 	dt = .01
 	y2 = solve_gauss_seidel(1 - L * dt, y, y, 1e-8, 100) # y2 = (I - L dt)-1 y
-	print "gauss-seidel: success"
+	print("gauss-seidel: success")
 	# solve crank-nicolson equation by jacobi
 	A = 1 - L * dt / 2
 	rhs = (1 + L * dt / 2)(y)
 	y = phi(x, sigma)
 	dt = .01
 	y2 = solve_jacobi(A, rhs, y, 1e-8, 100) # y2 = (I - L dt)-1 y
-	print "jacobi: success"
-	print "l2 err", l2(A(y2) - rhs)
+	print("jacobi: success")
+	print("l2 err", l2(A(y2) - rhs))
 	# solve crank-nicolson equation by gauss-seidel
 	y = phi(x, sigma)
 	dt = .01
 	y2 = solve_gauss_seidel(A, rhs, y, 1e-8, 100) # y2 = (I - L dt)-1 y
-	print "gauss-seidel: success"
-	print "l2 err", l2(A(y2) - rhs)
+	print("gauss-seidel: success")
+	print("l2 err", l2(A(y2) - rhs))
 	"""
 	# iterative solver for implicit scheme
 	y = phi(x, sigma)
@@ -407,7 +410,7 @@ if __name__ == '__main__':
 	yn = y0
 	#import pdb; pdb.set_trace()
 	while 1:
-		print '.',
+		print('.',)
 		yn = y0 + (L * dt)(yn)
 		yn[0] = yn[1] - (x[1] - x[0]) * (yn[2] - yn[1]) / (x[2] - x[1])
 		yn[-1] = yn[-2] + (x[-1] - x[-2]) * (yn[-2] - yn[-3]) / (x[-2] - x[-3]) 
@@ -424,7 +427,7 @@ if __name__ == '__main__':
 	yn = y0
 	while 1:
 		import pdb; pdb.set_trace()
-		print 'C',
+		print('C',)
 		yn = y0 + (L * dt / 2)(yn)
 		if l2(yn - y2) < 1e-7:
 			break
