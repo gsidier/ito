@@ -238,7 +238,7 @@ def iterate(step, x0, tol, maxiter, proj = None, callback = None):
 		step1 = lambda x: proj(step(x))
 	else:
 		step1 = step
-	for _ in xrange(maxiter):
+	for _ in range(maxiter):
 		if callback:
 			callback(locals())
 		x = step1(x0)

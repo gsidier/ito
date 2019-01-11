@@ -255,10 +255,12 @@ class BSPde(object):
 		
 		V = self.u_to_V(u)
 		if 'full_grid' in outputs:
-			V = np.array(Vt[::-1])
-			self.Vt = Vt
+			self.Vt = np.array(Vt[::-1])
 			self.St = np.array(St[::-1])
 			self.ut = np.array(ut[::-1])
+			res['St'] = self.St
+			res['ut'] = self.ut
+			res['Vt'] = self.Vt
 		
 		res['price'] = V
 		
